@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from Pipeline.data.schema import Customer
@@ -47,7 +47,7 @@ def _quintile_breakpoints(values: list[float]) -> list[float]:
 
 
 def compute_rfm(customers: List[Customer], date_cutoff: datetime) -> List[RFMScore]:
-    window_start = date_cutoff.replace(tzinfo=timezone.utc) - __import__("datetime").timedelta(days=RFM_WINDOW_DAYS)
+    window_start = date_cutoff.replace(tzinfo=timezone.utc) - timedelta(days=RFM_WINDOW_DAYS)
     date_cutoff = date_cutoff.replace(tzinfo=timezone.utc)
 
     # --- compute raw RFM values per customer ---

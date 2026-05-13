@@ -33,7 +33,7 @@ def _parse_date(value: str) -> datetime | None:
         return None
 
 
-def load_customers(csv_path: str) -> List[Customer]:
+def load_customers(csv_path: str) -> tuple[List[Customer], datetime]:
     path = Path(csv_path)
     if not path.exists():
         print(f"[loader] ERROR: file not found: {csv_path}")
@@ -163,4 +163,4 @@ def load_customers(csv_path: str) -> List[Customer]:
             f.write(json.dumps(entry) + "\n")
 
     print(f"[loader] loaded {len(customers)} customers ({len(skipped)} skipped) from {path.name}")
-    return customers
+    return customers, date_cutoff

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List
 
 from Pipeline.data.schema import Customer
-from Pipeline.config import INACTIVITY_THRESHOLD_DAYS, RFM_WINDOW_DAYS
+from Pipeline.config import INACTIVITY_THRESHOLD_DAYS, RFM_WINDOW_DAYS, FREQUENCY_DROP_THRESHOLD
 
 
 @dataclass
@@ -46,7 +46,7 @@ def check_r02_frequency_drop(customer: Customer, date_cutoff: datetime) -> RuleR
     if prior_count == 0:
         return RuleResult("R02", "Frequency Drop", False, "no prior period purchases to compare")
 
-    triggered = current_count < (prior_count * 0.5)
+    triggered = current_count < (prior_count * FREQUENCY_DROP_THRESHOLD)
     return RuleResult(
         rule_id="R02",
         rule_name="Frequency Drop",
@@ -63,9 +63,6 @@ def check_r03_high_value_lapse(customer: Customer, date_cutoff: datetime, top_20
 
     if not is_high_value:
         return RuleResult("R03", "High-Value Lapse", False, "not a high-value customer")
-
-    if customer.last_purchase_date is None:
-        return RuleResult("R03", "High-Value Lapse", True, "high-value customer with no purchases")
 
     days_inactive = (date_cutoff - customer.last_purchase_date).days
     triggered = days_inactive > 14

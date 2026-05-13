@@ -188,13 +188,16 @@ The pipeline accepts only a single canonical CSV format. A template file is prov
 **Execution order (runtime optimization):**
 
 ```
-1. Rules run FIRST → catches obvious at-risk customers (HIGH risk, bypasses ML)
-2. RFM scoring → computed for all customers (needed for ML features + ranking)
+1. Rules run FIRST → uses HIGH_VALUE_SPEND_THRESHOLD (fixed config) for R03 — no population scan needed
+2. RFM scoring → computed for all customers (R/F/M quintile breakpoints derived from population)
 3. ML predictor (if ml_enabled) → only scores customers NOT already flagged by rules
 4. Signal combination → assembles final at-risk list with risk levels
 ```
 
-**Why rules first:** Rules are cheap deterministic checks. Customers caught by rules are confirmed HIGH risk, so running them through ML adds no value — the outcome is the same. This saves ML inference cost at scale. All customers (including rule-flagged) are still used during offline ML training — only runtime inference skips the redundant scoring.
+**Why this order:**
+- **Rules first** — deterministic checks using a fixed config threshold for R03. No expensive population scan needed. Customers caught by rules are confirmed HIGH risk, so running them through ML afterward adds no value.
+- **RFM second** — O(n log n) population sort for quintile breakpoints. Must run before ML since ML uses RFM scores as features.
+- **ML last (for unflagged only)** — saves model inference cost at scale by skipping customers already determined HIGH risk by rules. All customers (including rule-flagged) are still used during offline ML training — only runtime inference skips the redundant scoring.
 
 ---
 
@@ -258,7 +261,7 @@ Hard cutoff rules applied as a safety net before RFM/ML scoring. A customer flag
 
 **Tunable threshold (R02):** `FREQUENCY_DROP_THRESHOLD` (default: 0.5) controls how steep a frequency drop must be to fire. Lower = stricter (fires on smaller drops), higher = more lenient.
 
-**Hybrid threshold strategy (R03):** The high-value threshold uses a **fixed config + drift detection** pattern instead of pure dynamic computation. This avoids the cost of computing a population-wide 80th percentile on every run, while still self-correcting when the data distribution shifts.
+**Hybrid threshold strategy (R03):** The high-value threshold uses a **fixed config + drift detection** pattern instead of pure dynamic computation. This avoids the cost of computing a population-wide 80th percentile on every run (which would force RFM to run before rules), while still self-correcting when the data distribution shifts significantly.
 
 ```
 1. Run R03 with HIGH_VALUE_SPEND_THRESHOLD (fixed config)         ← fast path
@@ -748,6 +751,6 @@ These are documented weaknesses that must be resolved before production. See `WE
 | C4 | Promo code lifecycle: `pending → active → redeemed/cancelled` — orphaned codes from aborted blasts are never redeemable | ✅ Resolved | Stage 3/4/5 |
 | C5 | SQL filter injection guard specified: `sqlparse` AST walk, token allowlist/blocklist, parameterized execution | ✅ Resolved | Stage 2 |
 | C1 | Random Forest ML ChurnPredictor added as Stage 2b — `ml_enabled` flag per campaign, trained offline, loaded at runtime | ✅ Resolved | Stage 2 |
-| C6 | Stage 2 execution order optimized: rules-first → RFM → ML for unflagged only. Rule-caught HIGH risk customers bypass ML scoring at runtime (still used in training) | ✅ Resolved | Stage 2 |
+| C6 | Stage 2 execution order: rules-first (cheap, uses fixed config for R03) → RFM → ML for unflagged only → combine. Rule-caught HIGH risk customers bypass ML scoring at runtime (still used in training). | ✅ Resolved | Stage 2 |
 | C7 | R02 frequency-drop ratio promoted to config (`FREQUENCY_DROP_THRESHOLD`) — tunable without code change | ✅ Resolved | Stage 2c |
 | C8 | R03 high-value threshold uses hybrid fixed-config + drift detection pattern (`HIGH_VALUE_SPEND_THRESHOLD` + `THRESHOLD_DRIFT_TOLERANCE`) — avoids per-run percentile recomputation while self-correcting on data drift | ✅ Resolved | Stage 2c |
