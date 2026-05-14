@@ -1,0 +1,42 @@
+{
+  "trained_at": "2026-05-14T17:41:30.523766",
+  "dataset": {
+    "total_customers": 1000,
+    "churn_rate": 0.4,
+    "churned": 400,
+    "not_churned": 600
+  },
+  "model": {
+    "type": "RandomForestClassifier",
+    "n_estimators": 100,
+    "random_state": 42
+  },
+  "metrics": {
+    "roc_auc_mean": 0.9833,
+    "roc_auc_std": 0.005,
+    "roc_auc_per_fold": [
+      0.9846,
+      0.9766,
+      0.9905,
+      0.9858,
+      0.9789
+    ]
+  },
+  "feature_importances": {
+    "purchase_count": 0.2881,
+    "recency_days": 0.1351,
+    "total_spend": 0.1218,
+    "r01": 0.0892,
+    "avg_order_value": 0.0584,
+    "r02": 0.057,
+    "combined_score": 0.0446,
+    "r_score": 0.0413,
+    "f_score": 0.0405,
+    "monetary": 0.0385,
+    "frequency": 0.0298,
+    "age": 0.0284,
+    "m_score": 0.0143,
+    "r03": 0.0129,
+    "r04": 0.0
+  }
+}

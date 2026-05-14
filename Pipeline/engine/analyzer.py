@@ -81,7 +81,7 @@ def analyze(customers: List[Customer], date_cutoff: datetime, ml_enabled: bool =
         predictor = ChurnPredictor()
         for customer in customers:
             if customer.customer_id not in rule_flagged_ids:
-                ml_scores[customer.customer_id] = predictor.score(customer, rfm_map.get(customer.customer_id))
+                ml_scores[customer.customer_id] = predictor.score(customer, rfm_map.get(customer.customer_id), date_cutoff)
 
     # --- Step 5: determine at-risk customers and assign risk levels ---
     at_risk: list[AtRiskCustomer] = []
