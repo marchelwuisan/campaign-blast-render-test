@@ -1,6 +1,6 @@
 import pickle
 from Pipeline.config import ML_MODEL_PATH
-from Pipeline.engine.train import build_features
+from Pipeline.engine.training.train_temporal import build_features
 
 class ChurnPredictor:
     def __init__(self):
