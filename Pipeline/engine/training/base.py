@@ -27,8 +27,16 @@ def build_features(customer, rfm, fired_rules):
     }
 
 def evaluate_model(model, X, X_test, y_test, minimum_accuracy, minimum_roc_auc):
+    unique_classes = y_test.unique()
+    if len(unique_classes) < 2:
+        raise ValueError(
+            f"Test set contains only one class ({unique_classes.tolist()}). "
+            "The dataset time span is too short for the PREDICTION_DAYS window — "
+            "reduce PREDICTION_DAYS or use a dataset with a longer date range."
+        )
+
     y_pred = model.predict(X_test)
-    
+
     accuracy    = accuracy_score(y_test, y_pred)
     roc_auc     = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
     

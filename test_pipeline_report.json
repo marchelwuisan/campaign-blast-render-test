@@ -1,0 +1,370 @@
+{
+  "generated_at": "2026-05-17T19:15:10.099039",
+  "date_cutoff": "2011-12-09",
+  "config": {
+    "ml_enabled": true,
+    "ml_model_path": "/Users/sam/Developer/WA-Blast/Pipeline/engine/models/temporal/churn_rf.pkl",
+    "ml_churn_threshold": 0.8,
+    "rfm_window_days": 180,
+    "rfm_at_risk_threshold": 6,
+    "inactivity_threshold_days": 300,
+    "high_value_spend_threshold": 1500.0,
+    "max_blast_size": 10000,
+    "promo_expiry_days": 7,
+    "sender_mode": "mock"
+  },
+  "stage_1": {
+    "total_customers_loaded": 4263
+  },
+  "stage_2": {
+    "at_risk_count": 2246,
+    "at_risk_percent": 52.7,
+    "risk_level_distribution": {
+      "HIGH": 1069,
+      "MEDIUM": 823,
+      "LOW": 354
+    },
+    "rule_firing_counts": {
+      "R01_long_inactivity": 250,
+      "R02_frequency_drop": 616,
+      "R03_high_value_lapse": 237,
+      "R04_single_purchase": 80,
+      "customers_with_any_rule": 1100,
+      "customers_rfm_only": 1146
+    },
+    "rfm_score_distribution": {
+      "min": 3,
+      "max": 15,
+      "avg": 6.8
+    },
+    "days_inactive_distribution": {
+      "min": 0,
+      "max": 373,
+      "avg": 154.8,
+      "buckets": {
+        "0-30": 241,
+        "31-90": 556,
+        "91-180": 591,
+        "181-365": 794,
+        "365+": 64
+      }
+    },
+    "ml": {
+      "enabled": true,
+      "model_path": "/Users/sam/Developer/WA-Blast/Pipeline/engine/models/temporal/churn_rf.pkl",
+      "threshold": 0.8,
+      "total_scored": 3163,
+      "skipped_rule_flagged": 1100,
+      "above_threshold": 1146,
+      "below_threshold": 2017,
+      "above_threshold_pct": 36.2,
+      "score_distribution": {
+        "0.0-0.2": 0,
+        "0.2-0.4": 2,
+        "0.4-0.6": 40,
+        "0.6-0.8": 1975,
+        "0.8-1.0": 1146
+      },
+      "score_stats": {
+        "min": 0.33,
+        "max": 1.0,
+        "avg": 0.7902
+      }
+    },
+    "population_rfm_stats": {
+      "total": 4263,
+      "below_6": 858,
+      "below_7": 1116,
+      "below_8": 1435,
+      "below_9": 1858,
+      "below_10": 2257,
+      "avg": 9.0
+    }
+  },
+  "stage_3": {
+    "promos_assigned": 2246,
+    "promo_distribution": {
+      "discount_30": 237,
+      "discount_20": 832,
+      "ship_discount_15": 540,
+      "bogo": 36,
+      "points_2x": 601
+    }
+  },
+  "stage_4_5": {
+    "sample_sent": 3,
+    "sender_mode": "mock"
+  },
+  "sample_at_risk": [
+    {
+      "customer_id": "18074.0",
+      "name": "Customer 18074.0",
+      "phone": "+62812000180740",
+      "risk_level": "HIGH",
+      "days_inactive": 373,
+      "rfm": {
+        "r_score": 1,
+        "f_score": 1,
+        "m_score": 1,
+        "combined_score": 3
+      },
+      "triggered_rules": [
+        "R01"
+      ],
+      "spend_summary": {
+        "total_spend": 471.9,
+        "avg_order_value": 39.32,
+        "top_category": "Wood Black Board Ant White Finish"
+      },
+      "promo": {
+        "promo_type": "discount_20",
+        "promo_value": "20% off your next purchase",
+        "promo_code": "BACK20",
+        "expiry_days": 7
+      }
+    },
+    {
+      "customer_id": "13747.0",
+      "name": "Customer 13747.0",
+      "phone": "+62812000137470",
+      "risk_level": "HIGH",
+      "days_inactive": 373,
+      "rfm": {
+        "r_score": 1,
+        "f_score": 1,
+        "m_score": 1,
+        "combined_score": 3
+      },
+      "triggered_rules": [
+        "R04"
+      ],
+      "spend_summary": {
+        "total_spend": 79.6,
+        "avg_order_value": 79.6,
+        "top_category": "Retrospot Lamp"
+      },
+      "promo": {
+        "promo_type": "discount_20",
+        "promo_value": "20% off your next purchase",
+        "promo_code": "BACK20",
+        "expiry_days": 7
+      }
+    },
+    {
+      "customer_id": "12791.0",
+      "name": "Customer 12791.0",
+      "phone": "+62812000127910",
+      "risk_level": "HIGH",
+      "days_inactive": 373,
+      "rfm": {
+        "r_score": 1,
+        "f_score": 1,
+        "m_score": 1,
+        "combined_score": 3
+      },
+      "triggered_rules": [
+        "R01"
+      ],
+      "spend_summary": {
+        "total_spend": 192.6,
+        "avg_order_value": 96.3,
+        "top_category": "Hand Warmer Bird Design"
+      },
+      "promo": {
+        "promo_type": "discount_20",
+        "promo_value": "20% off your next purchase",
+        "promo_code": "BACK20",
+        "expiry_days": 7
+      }
+    },
+    {
+      "customer_id": "17908.0",
+      "name": "Customer 17908.0",
+      "phone": "+62812000179080",
+      "risk_level": "HIGH",
+      "days_inactive": 373,
+      "rfm": {
+        "r_score": 1,
+        "f_score": 1,
+        "m_score": 1,
+        "combined_score": 3
+      },
+      "triggered_rules": [
+        "R01"
+      ],
+      "spend_summary": {
+        "total_spend": 157.33,
+        "avg_order_value": 5.43,
+        "top_category": "5 Strand Glass Necklace Crystal"
+      },
+      "promo": {
+        "promo_type": "discount_20",
+        "promo_value": "20% off your next purchase",
+        "promo_code": "BACK20",
+        "expiry_days": 7
+      }
+    },
+    {
+      "customer_id": "16583.0",
+      "name": "Customer 16583.0",
+      "phone": "+62812000165830",
+      "risk_level": "HIGH",
+      "days_inactive": 373,
+      "rfm": {
+        "r_score": 1,
+        "f_score": 1,
+        "m_score": 1,
+        "combined_score": 3
+      },
+      "triggered_rules": [
+        "R01"
+      ],
+      "spend_summary": {
+        "total_spend": 117.65,
+        "avg_order_value": 16.81,
+        "top_category": "Wooden Box Of Dominoes"
+      },
+      "promo": {
+        "promo_type": "discount_20",
+        "promo_value": "20% off your next purchase",
+        "promo_code": "BACK20",
+        "expiry_days": 7
+      }
+    },
+    {
+      "customer_id": "17968.0",
+      "name": "Customer 17968.0",
+      "phone": "+62812000179680",
+      "risk_level": "HIGH",
+      "days_inactive": 373,
+      "rfm": {
+        "r_score": 1,
+        "f_score": 1,
+        "m_score": 1,
+        "combined_score": 3
+      },
+      "triggered_rules": [
+        "R01"
+      ],
+      "spend_summary": {
+        "total_spend": 157.86,
+        "avg_order_value": 4.64,
+        "top_category": "Star  T-Light Holder"
+      },
+      "promo": {
+        "promo_type": "discount_20",
+        "promo_value": "20% off your next purchase",
+        "promo_code": "BACK20",
+        "expiry_days": 7
+      }
+    },
+    {
+      "customer_id": "14729.0",
+      "name": "Customer 14729.0",
+      "phone": "+62812000147290",
+      "risk_level": "HIGH",
+      "days_inactive": 373,
+      "rfm": {
+        "r_score": 1,
+        "f_score": 1,
+        "m_score": 1,
+        "combined_score": 3
+      },
+      "triggered_rules": [
+        "R01"
+      ],
+      "spend_summary": {
+        "total_spend": 212.2,
+        "avg_order_value": 5.89,
+        "top_category": "Classic French Style Basket Natural"
+      },
+      "promo": {
+        "promo_type": "discount_20",
+        "promo_value": "20% off your next purchase",
+        "promo_code": "BACK20",
+        "expiry_days": 7
+      }
+    },
+    {
+      "customer_id": "14237.0",
+      "name": "Customer 14237.0",
+      "phone": "+62812000142370",
+      "risk_level": "HIGH",
+      "days_inactive": 373,
+      "rfm": {
+        "r_score": 1,
+        "f_score": 1,
+        "m_score": 1,
+        "combined_score": 3
+      },
+      "triggered_rules": [
+        "R01"
+      ],
+      "spend_summary": {
+        "total_spend": 126.3,
+        "avg_order_value": 18.04,
+        "top_category": "Cake Plate Lovebird White"
+      },
+      "promo": {
+        "promo_type": "discount_20",
+        "promo_value": "20% off your next purchase",
+        "promo_code": "BACK20",
+        "expiry_days": 7
+      }
+    },
+    {
+      "customer_id": "15350.0",
+      "name": "Customer 15350.0",
+      "phone": "+62812000153500",
+      "risk_level": "HIGH",
+      "days_inactive": 373,
+      "rfm": {
+        "r_score": 1,
+        "f_score": 1,
+        "m_score": 1,
+        "combined_score": 3
+      },
+      "triggered_rules": [
+        "R01"
+      ],
+      "spend_summary": {
+        "total_spend": 40.05,
+        "avg_order_value": 20.02,
+        "top_category": "Hand Warmer Scotty Dog Design"
+      },
+      "promo": {
+        "promo_type": "discount_20",
+        "promo_value": "20% off your next purchase",
+        "promo_code": "BACK20",
+        "expiry_days": 7
+      }
+    },
+    {
+      "customer_id": "15922.0",
+      "name": "Customer 15922.0",
+      "phone": "+62812000159220",
+      "risk_level": "HIGH",
+      "days_inactive": 373,
+      "rfm": {
+        "r_score": 1,
+        "f_score": 1,
+        "m_score": 1,
+        "combined_score": 3
+      },
+      "triggered_rules": [
+        "R01"
+      ],
+      "spend_summary": {
+        "total_spend": 304.1,
+        "avg_order_value": 33.79,
+        "top_category": "Cosmetic Bag Vintage Rose Paisley"
+      },
+      "promo": {
+        "promo_type": "discount_20",
+        "promo_value": "20% off your next purchase",
+        "promo_code": "BACK20",
+        "expiry_days": 7
+      }
+    }
+  ]
+}

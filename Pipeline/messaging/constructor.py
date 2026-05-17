@@ -16,6 +16,7 @@ Use code {code_id} - valid for {days_valid} days.
 
 See you soon!"""
 
+
 @dataclass
 class WhatsAppMessage:
     to: str

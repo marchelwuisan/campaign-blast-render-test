@@ -12,7 +12,6 @@ from Pipeline.config import (
     THRESHOLD_DRIFT_TOLERANCE,
 )
 
-
 RISK_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
 
@@ -31,8 +30,8 @@ class AtRiskCustomer:
     gender: Optional[str]
     age: Optional[int]
     rfm: RFMScore
-    risk_level: str                     # "HIGH" | "MEDIUM" | "LOW"
-    triggered_rules: List[str]          # e.g. ["R01", "R03"]
+    risk_level: str  # "HIGH" | "MEDIUM" | "LOW"
+    triggered_rules: List[str]  # e.g. ["R01", "R03"]
     days_since_last_purchase: int
     spend_summary: SpendSummary
     churn_probability: Optional[float] = field(default=None)  # set by ML if ml_enabled
@@ -56,11 +55,19 @@ def _compute_dynamic_threshold(customers: List[Customer]) -> float:
     return spends[lo] + (idx - lo) * (spends[hi] - spends[lo])
 
 
-def analyze(customers: List[Customer], date_cutoff: datetime, ml_enabled: bool = False) -> List[AtRiskCustomer]:
+def analyze(
+    customers: List[Customer], date_cutoff: datetime, ml_enabled: bool = False
+) -> tuple[List[AtRiskCustomer], dict, dict]:
     # --- Step 1: compute dynamic threshold and check drift vs fixed config ---
     dynamic_threshold = _compute_dynamic_threshold(customers)
-    drift = abs(dynamic_threshold - HIGH_VALUE_SPEND_THRESHOLD) / (HIGH_VALUE_SPEND_THRESHOLD or 1)
-    use_threshold = dynamic_threshold if drift > THRESHOLD_DRIFT_TOLERANCE else HIGH_VALUE_SPEND_THRESHOLD
+    drift = abs(dynamic_threshold - HIGH_VALUE_SPEND_THRESHOLD) / (
+        HIGH_VALUE_SPEND_THRESHOLD or 1
+    )
+    use_threshold = (
+        dynamic_threshold
+        if drift > THRESHOLD_DRIFT_TOLERANCE
+        else HIGH_VALUE_SPEND_THRESHOLD
+    )
 
     # --- Step 2: run rules first on all customers (fast path) ---
     rule_results: dict[str, List[str]] = {}
@@ -76,12 +83,51 @@ def analyze(customers: List[Customer], date_cutoff: datetime, ml_enabled: bool =
 
     # --- Step 4: ML scoring for non-rule-flagged customers (if enabled) ---
     ml_scores: dict[str, float] = {}
+    ml_stats: dict = {"enabled": False}
     if ml_enabled:
         from Pipeline.engine.ml import ChurnPredictor
+        from Pipeline.config import ML_CHURN_THRESHOLD, ML_MODEL_PATH
+
         predictor = ChurnPredictor()
         for customer in customers:
             if customer.customer_id not in rule_flagged_ids:
-                ml_scores[customer.customer_id] = predictor.score(customer, rfm_map.get(customer.customer_id), date_cutoff)
+                ml_scores[customer.customer_id] = predictor.score(
+                    customer, rfm_map.get(customer.customer_id), date_cutoff
+                )
+
+        scored = list(ml_scores.values())
+        above = [s for s in scored if s >= ML_CHURN_THRESHOLD]
+        buckets = {"0.0-0.2": 0, "0.2-0.4": 0, "0.4-0.6": 0, "0.6-0.8": 0, "0.8-1.0": 0}
+        for s in scored:
+            if s < 0.2:
+                buckets["0.0-0.2"] += 1
+            elif s < 0.4:
+                buckets["0.2-0.4"] += 1
+            elif s < 0.6:
+                buckets["0.4-0.6"] += 1
+            elif s < 0.8:
+                buckets["0.6-0.8"] += 1
+            else:
+                buckets["0.8-1.0"] += 1
+
+        ml_stats = {
+            "enabled": True,
+            "model_path": ML_MODEL_PATH,
+            "threshold": ML_CHURN_THRESHOLD,
+            "total_scored": len(scored),
+            "skipped_rule_flagged": len(rule_flagged_ids),
+            "above_threshold": len(above),
+            "below_threshold": len(scored) - len(above),
+            "above_threshold_pct": (
+                round(len(above) / len(scored) * 100, 1) if scored else 0
+            ),
+            "score_distribution": buckets,
+            "score_stats": {
+                "min": round(min(scored), 4) if scored else 0,
+                "max": round(max(scored), 4) if scored else 0,
+                "avg": round(sum(scored) / len(scored), 4) if scored else 0,
+            },
+        }
 
     # --- Step 5: determine at-risk customers and assign risk levels ---
     at_risk: list[AtRiskCustomer] = []
@@ -95,10 +141,10 @@ def analyze(customers: List[Customer], date_cutoff: datetime, ml_enabled: bool =
         churn_prob = ml_scores.get(customer.customer_id)
 
         from Pipeline.config import ML_CHURN_THRESHOLD
+
         is_at_risk = (
             bool(fired)
             or rfm.combined_score < RFM_AT_RISK_THRESHOLD
-            or rfm.r_score <= 2
             or (churn_prob is not None and churn_prob >= ML_CHURN_THRESHOLD)
         )
 
@@ -107,23 +153,25 @@ def analyze(customers: List[Customer], date_cutoff: datetime, ml_enabled: bool =
 
         risk_level = _assign_risk_level(rfm, fired)
 
-        at_risk.append(AtRiskCustomer(
-            customer_id=customer.customer_id,
-            name=customer.customer_name,
-            phone=customer.phone_number,
-            gender=customer.gender,
-            age=customer.age,
-            rfm=rfm,
-            risk_level=risk_level,
-            triggered_rules=fired,
-            days_since_last_purchase=rfm.recency_days,
-            spend_summary=SpendSummary(
-                total_spend=customer.total_spend,
-                avg_order_value=customer.avg_order_value,
-                top_category=customer.top_category,
-            ),
-            churn_probability=churn_prob,
-        ))
+        at_risk.append(
+            AtRiskCustomer(
+                customer_id=customer.customer_id,
+                name=customer.customer_name,
+                phone=customer.phone_number,
+                gender=customer.gender,
+                age=customer.age,
+                rfm=rfm,
+                risk_level=risk_level,
+                triggered_rules=fired,
+                days_since_last_purchase=rfm.recency_days,
+                spend_summary=SpendSummary(
+                    total_spend=customer.total_spend,
+                    avg_order_value=customer.avg_order_value,
+                    top_category=customer.top_category,
+                ),
+                churn_probability=churn_prob,
+            )
+        )
 
     # --- Step 6: sort by risk level, then by days since last purchase (most inactive first) ---
     at_risk.sort(key=lambda c: (RISK_ORDER[c.risk_level], -c.days_since_last_purchase))
@@ -131,6 +179,19 @@ def analyze(customers: List[Customer], date_cutoff: datetime, ml_enabled: bool =
     # --- Step 7: apply blast cap ---
     if len(at_risk) > MAX_BLAST_SIZE:
         at_risk = sorted(at_risk, key=lambda c: -c.rfm.combined_score)[:MAX_BLAST_SIZE]
-        at_risk.sort(key=lambda c: (RISK_ORDER[c.risk_level], -c.days_since_last_purchase))
+        at_risk.sort(
+            key=lambda c: (RISK_ORDER[c.risk_level], -c.days_since_last_purchase)
+        )
 
-    return at_risk
+    all_scores = [r.combined_score for r in rfm_map.values()]
+    population_rfm_stats = {
+        "total": len(all_scores),
+        "below_6": sum(1 for s in all_scores if s < 6),
+        "below_7": sum(1 for s in all_scores if s < 7),
+        "below_8": sum(1 for s in all_scores if s < 8),
+        "below_9": sum(1 for s in all_scores if s < 9),
+        "below_10": sum(1 for s in all_scores if s < 10),
+        "avg": round(sum(all_scores) / len(all_scores), 2) if all_scores else 0,
+    }
+
+    return at_risk, ml_stats, population_rfm_stats
