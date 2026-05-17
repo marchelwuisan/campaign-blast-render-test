@@ -354,6 +354,33 @@ Any column present in the customer dataset is queryable — adding a new data co
 
 **Goal:** Assign the most appropriate promo offer to each at-risk customer using a deterministic rule-based mapping.
 
+---
+
+#### POC Implementation (current)
+
+Simple mapping function — no database, no lifecycle, no cooldown. Input is `AtRiskCustomer`, output is a `PromoOffer`. High spender is determined by comparing `spend_summary.total_spend` against `HIGH_VALUE_SPEND_THRESHOLD` from config.
+
+**Promo mapping (if/elif):**
+
+| Condition | Promo Value | Code |
+|---|---|---|
+| HIGH risk + total_spend ≥ HIGH_VALUE_SPEND_THRESHOLD | 30% off your next purchase | `BACK30` |
+| HIGH risk + regular spend | 20% off your next purchase | `BACK20` |
+| MEDIUM risk + R02 fired | Free shipping + 15% off | `SHIP15` |
+| MEDIUM risk + R04 fired | Buy 1 Get 1 on any item | `BOGO1` |
+| LOW risk (default) | 2x loyalty points on next purchase | `POINTS2X` |
+
+**Output — `PromoOffer` dataclass:**
+- `promo_type` — category string (e.g. `discount_30`)
+- `promo_value` — human-readable offer string (e.g. `"30% off your next purchase"`)
+- `promo_code` — static code (e.g. `BACK30`)
+
+**What is deferred to production:** unique per-customer codes, SQLite promo lifecycle, cooldown check, promo deduplication, budget cap enforcement, AI toggle. Full spec below.
+
+---
+
+#### Production Spec (deferred)
+
 **AI toggle:** Each campaign can set `ai_enabled: true/false` (default: `false`). When `false`, the rule-based mapping table runs. When `true`, Claude API is called instead. Either way, the output is always a `PromoOffer` object — Stages 4 and 5 are unaware of which strategy was used. `ANTHROPIC_API_KEY` is only required when `ai_enabled=true`.
 
 **Input:** `AtRiskCustomer` object (risk level, RFM scores, triggered rules, spend summary)
