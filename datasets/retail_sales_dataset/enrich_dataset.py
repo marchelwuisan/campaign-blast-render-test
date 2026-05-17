@@ -3,7 +3,7 @@ import numpy as np
 from datetime import timedelta
 
 INPUT  = "retail_sales_dataset.csv"
-OUTPUT = "Pipeline/transactions.csv"
+OUTPUT = "transactions.csv"
 SEED   = 42
 
 # Behavioral profiles — % of 1000 customers assigned to each
@@ -112,8 +112,8 @@ profile_df = pd.DataFrame([
     {"customer_id": cid, "profile": pname}
     for cid, (pname, _) in cutoffs.items()
 ])
-profile_df.to_csv("Pipeline/customer_profiles.csv", index=False)
-print(f"  Profile mapping   : saved to Pipeline/customer_profiles.csv")
+profile_df.to_csv("customer_profiles.csv", index=False)
+print(f"  Profile mapping   : saved to customer_profiles.csv")
 
 # Summary
 txn_per_customer = combined.groupby("customer_id").size()

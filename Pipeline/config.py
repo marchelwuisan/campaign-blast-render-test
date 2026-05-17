@@ -35,7 +35,7 @@ WA_ACCESS_TOKEN = os.getenv("WA_ACCESS_TOKEN", "")
 WA_PHONE_NUMBER_ID = os.getenv("WA_PHONE_NUMBER_ID", "")
 
 # --- ML ---
-ML_MODEL_PATH = os.getenv("ML_MODEL_PATH", str(BASE_DIR / "engine" / "models" / "churn_rf.pkl"))
+ML_MODEL_PATH = os.getenv("ML_MODEL_PATH", str(BASE_DIR / "engine/models/temporal/churn_rf.pkl"))
 ML_CHURN_THRESHOLD = float(os.getenv("ML_CHURN_THRESHOLD", 0.6))
 
 # --- AI ---

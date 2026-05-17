@@ -1,0 +1,63 @@
+{
+  "trained_at": "2026-05-15T12:48:06.602203",
+  "dataset": {
+    "total_customers": 2580,
+    "churn_rate": 0.641,
+    "churned": 1654,
+    "not_churned": 926
+  },
+  "model": {
+    "type": "RandomForestClassifier",
+    "params": {
+      "bootstrap": true,
+      "ccp_alpha": 0.0,
+      "class_weight": null,
+      "criterion": "gini",
+      "max_depth": null,
+      "max_features": "sqrt",
+      "max_leaf_nodes": null,
+      "max_samples": null,
+      "min_impurity_decrease": 0.0,
+      "min_samples_leaf": 1,
+      "min_samples_split": 2,
+      "min_weight_fraction_leaf": 0.0,
+      "monotonic_cst": null,
+      "n_estimators": 100,
+      "n_jobs": null,
+      "oob_score": false,
+      "random_state": 42,
+      "verbose": 0,
+      "warm_start": false
+    }
+  },
+  "metrics": {
+    "accuracy": 0.8016,
+    "roc_auc": 0.8842,
+    "roc_auc_mean": 0.8884,
+    "roc_auc_std": 0.0059,
+    "roc_auc_per_fold": [
+      0.8799,
+      0.8856,
+      0.8935,
+      0.8963,
+      0.8865
+    ]
+  },
+  "feature_importances": {
+    "recency_days": 0.2377,
+    "r_score": 0.1152,
+    "total_spend": 0.1098,
+    "monetary": 0.1033,
+    "purchase_count": 0.0975,
+    "frequency": 0.0927,
+    "avg_order_value": 0.0837,
+    "combined_score": 0.0701,
+    "f_score": 0.0279,
+    "r01": 0.024,
+    "m_score": 0.019,
+    "r02": 0.0181,
+    "r03": 0.0011,
+    "r04": 0.0,
+    "age": 0.0
+  }
+}
