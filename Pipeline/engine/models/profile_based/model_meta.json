@@ -1,0 +1,7 @@
+{
+  "approach": "profile_based",
+  "trained_at": "2026-05-15T11:51:49.206399",
+  "model_path": "Pipeline/engine/models/profile_based/churn_rf.pkl",
+  "roc_auc_mean": 0.9833,
+  "roc_auc_std": 0.005
+}
