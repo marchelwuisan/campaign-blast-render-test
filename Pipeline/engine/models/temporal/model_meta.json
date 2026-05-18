@@ -1,6 +1,6 @@
 {
   "approach": "temporal",
-  "trained_at": "2026-05-17T16:15:19.425573",
+  "trained_at": "2026-05-17T19:48:25.608981",
   "model_path": "Pipeline/engine/models/temporal/churn_rf.pkl",
   "roc_auc_mean": 0.8934,
   "roc_auc_std": 0.0106
