@@ -8,7 +8,7 @@ from Pipeline.config import DB_PATH
 def get_connection() -> sqlite3.Connection:
     path = Path(DB_PATH)
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(path), detect_types=sqlite3.PARSE_DECLTYPES)
+    conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -66,5 +66,32 @@ def init_db() -> None:
                 customer_id         TEXT PRIMARY KEY,
                 last_sent_at        TIMESTAMP NOT NULL,
                 sent_promo_types    TEXT NOT NULL DEFAULT '' -- comma-separated
+            );
+            CREATE TABLE IF NOT EXISTS at_risk_customers (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                blast_id        TEXT NOT NULL,
+                customer_id     TEXT NOT NULL,
+                name            TEXT NOT NULL,
+                phone           TEXT NOT NULL,
+                risk_level      TEXT NOT NULL,
+                days_inactive   INTEGER NOT NULL,
+                r_score         INTEGER NOT NULL,
+                f_score         INTEGER NOT NULL,
+                m_score         INTEGER NOT NULL,
+                combined_score  INTEGER NOT NULL,
+                triggered_rules TEXT NOT NULL,
+                scored_at       TIMESTAMP NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_at_risk_blast_id
+                ON at_risk_customers (blast_id);
+
+            CREATE TABLE IF NOT EXISTS promo_assignments (
+                blast_id        TEXT NOT NULL,
+                customer_id     TEXT NOT NULL,
+                promo_type      TEXT NOT NULL,
+                promo_value     TEXT NOT NULL,
+                promo_code      TEXT NOT NULL,
+                expiry_days     INTEGER NOT NULL,
+                PRIMARY KEY (blast_id, customer_id)
             );
         """)

@@ -24,22 +24,4 @@ class MockSender(BaseSender):
         print(f"BODY    :\n{message.body}")
         print(f"{'='*50}")
 
-        with transaction() as conn:
-            conn.execute(
-                """
-                INSERT INTO blast_log
-                    (blast_id, customer_id, phone, template_name, promo_code, status, sent_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    blast_id,
-                    customer_id,
-                    message.to,
-                    message.template_name,
-                    message.promo_code,
-                    "mocked",
-                    datetime.now().isoformat(),
-                ),
-            )
-
         return SendResult(status="mocked", customer_id=customer_id, phone=message.to)
