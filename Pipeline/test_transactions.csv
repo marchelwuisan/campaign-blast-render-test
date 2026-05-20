@@ -1,9 +1,5 @@
 customer_id,customer_name,phone_number,created_at,purchase_date,order_value,product_category
-CUST001,Test1,<insert_real_phone_number1>,2023-01-01,2023-08-10,250000,Electronics
-CUST001,Test1,<insert_real_phone_number1>,2023-01-01,2023-09-15,175000,Electronics
-CUST001,Test1,<insert_real_phone_number1>,2023-01-01,2023-10-02,320000,Fashion
-CUST001,Test1,<insert_real_phone_number1>,2023-01-01,2024-06-01,100000,Fashion
-CUST002,Test2,<insert_real_phone_number2>,2023-01-01,2023-08-10,250000,Electronics
-CUST002,Test2,<insert_real_phone_number2>,2023-01-01,2023-09-15,175000,Electronics
-CUST002,Test2,<insert_real_phone_number2>,2023-01-01,2023-10-02,320000,Fashion
-CUST002,Test2,<insert_real_phone_number2>,2023-01-01,2024-06-01,100000,Fashion
+CUST001,test1,<insert_real_phone_number1>,2023-01-01,2023-08-10,250000,Electronics
+CUST001,test1,<insert_real_phone_number1>,2023-01-01,2023-09-15,175000,Electronics
+CUST001,test1,<insert_real_phone_number1>,2023-01-01,2023-10-02,320000,Fashion
+CUTOFF,Cutoff,INVALID,2020-01-01,2024-11-01,10000,Other

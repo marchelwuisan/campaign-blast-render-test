@@ -20,7 +20,10 @@ def _build_payload(msg: WhatsAppMessage) -> dict:
     if msg.template_params:
         template["components"] = [{
             "type": "body",
-            "parameters": [{"type": "text", "text": p} for p in msg.template_params],
+            "parameters": [
+                {"type": "text", "parameter_name": name, "text": value}
+                for name, value in msg.template_params
+            ],
         }]
     return {
         "messaging_product": "whatsapp",
@@ -58,7 +61,9 @@ def send_meta(msg: WhatsAppMessage) -> dict:
                 "promo_code": msg.promo_code, "message_id": message_id}
 
     try:
-        error_reason = response.json().get("error", {}).get("message", response.text)
+        error_obj = response.json().get("error", {})
+        error_reason = error_obj.get("message", response.text)
+        print(f"[debug] full error: {error_obj}")
     except Exception:
         error_reason = response.text
 

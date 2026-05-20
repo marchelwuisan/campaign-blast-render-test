@@ -11,7 +11,7 @@ from Pipeline.messaging.meta_sender import send_meta
 
 def main():
     customers, date_cutoff = load_customers("Pipeline/test_transactions.csv")
-    at_risk = analyze(customers, date_cutoff)
+    at_risk, _, _ = analyze(customers, date_cutoff)
 
     if not at_risk:
         print("[test] no at-risk customers found — check test_transactions.csv")
@@ -22,26 +22,16 @@ def main():
     print(f"[test] phone    : {customer.phone}")
     print(f"[test] risk     : {customer.risk_level} (rules: {customer.triggered_rules})")
 
-    msg = WhatsAppMessage(
-        to=customer.phone,
-        body="hello_world test 123",
-        customer_id=customer.customer_id,
-        promo_code="",
-        template_name="hello_world",
-        language_code="en_US",
-        template_params=[],
-    )
-
-    # from Pipeline.promo.mapping import assign_promo
-    # from Pipeline.messaging.constructor import construct_message, validate_message
-    # promo = assign_promo(customer)
-    # print(f"[test] promo    : {promo.promo_type} — {promo.promo_value} ({promo.promo_code})")
-    # msg = construct_message(customer, promo)
-    # err = validate_message(msg)
-    # if err:
-    #     print(f"[test] VALIDATION FAILED: {err}")
-    #     return
-    # print(f"\n[test] message preview:\n{msg.body}\n")
+    from Pipeline.promo.mapping import assign_promo
+    from Pipeline.messaging.constructor import construct_message, validate_message
+    promo = assign_promo(customer)
+    print(f"[test] promo    : {promo.promo_type} — {promo.promo_value} ({promo.promo_code})")
+    msg = construct_message(customer, promo)
+    err = validate_message(msg)
+    if err:
+        print(f"[test] VALIDATION FAILED: {err}")
+        return
+    print(f"\n[test] message preview:\n{msg.body}\n")
 
     print(f"\n[test] sending {msg.template_name} to {msg.to}...")
     result = send_meta(msg)
