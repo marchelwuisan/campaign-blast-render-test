@@ -13,12 +13,14 @@ from Pipeline.engine.analyzer import analyze
 from Pipeline.promo.mapping import assign_promo
 from Pipeline.messaging.constructor import construct_message
 from Pipeline.messaging.mock_sender import MockSender
+from Pipeline.database.db import init_db
 
 REPORT_PATH = "test_pipeline_report.json"
 SAMPLE_SEND_COUNT = 3  # number of customers to run through Stage 4 + 5
 
 
 def main():
+    init_db()
     customers, date_cutoff = load_customers("Pipeline/transactions.csv")
 
     ml_enabled = True
@@ -83,7 +85,7 @@ def main():
     for customer in at_risk[:SAMPLE_SEND_COUNT]:
         promo = promos[customer.customer_id]
         message = construct_message(customer, promo)
-        sender.send(message, customer.customer_id)
+        sender.send(message, customer.customer_id, blast_id="test-run")
 
     # --- promo distribution ---
     promo_counts = Counter(p.promo_type for p in promos.values())

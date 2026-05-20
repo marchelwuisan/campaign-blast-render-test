@@ -13,5 +13,7 @@ class SendResult:
 
 class BaseSender(ABC):
     @abstractmethod
-    def send(self, message: WhatsAppMessage, customer_id: str) -> SendResult:
+    def send(
+        self, message: WhatsAppMessage, customer_id: str, blast_id: str
+    ) -> SendResult:
         pass

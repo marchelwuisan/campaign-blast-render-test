@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-17T19:15:10.099039",
+  "generated_at": "2026-05-18T14:02:13.851469",
   "date_cutoff": "2011-12-09",
   "config": {
     "ml_enabled": true,
@@ -11,7 +11,7 @@
     "high_value_spend_threshold": 1500.0,
     "max_blast_size": 10000,
     "promo_expiry_days": 7,
-    "sender_mode": "mock"
+    "sender_mode": "meta"
   },
   "stage_1": {
     "total_customers_loaded": 4263
@@ -93,7 +93,7 @@
   },
   "stage_4_5": {
     "sample_sent": 3,
-    "sender_mode": "mock"
+    "sender_mode": "meta"
   },
   "sample_at_risk": [
     {
