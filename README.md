@@ -82,7 +82,38 @@ Must be re-run if the dataset changes or `build_features()` is modified.
 Outputs:
 - `test_pipeline_report.json` — at-risk customer summary with risk distribution, rule counts, and sample output
 
-### 4. Run the API
+### 4. Run the Dashboard (optional)
+
+Install dashboard dependencies first (if not already):
+
+```bash
+.venv/bin/pip install streamlit plotly requests
+```
+
+Start both the API and the dashboard in separate terminals:
+
+```bash
+# Terminal 1 — API server
+.venv/bin/python -m uvicorn Pipeline.api.main:app --reload
+
+# Terminal 2 — Streamlit dashboard
+.venv/bin/python -m streamlit run dashboard/app.py
+```
+
+The dashboard runs at `http://localhost:8501` and connects to the API at `http://localhost:8000`.
+
+**Dashboard pages:**
+
+| Page | Description |
+|---|---|
+| Blast | Preview or trigger a blast, toggle ML, view result summary |
+| Logs | Paginated blast history with search and date filters |
+| Customers | At-risk customer list with risk level filter (engine runs once per session) |
+| Analytics | Engine overview (risk distribution, rule counts) + per-blast metrics and charts |
+
+---
+
+### 5. Run the API
 
 Install API dependencies first (if not already):
 

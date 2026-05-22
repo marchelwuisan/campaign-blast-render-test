@@ -1,9 +1,27 @@
 from fastapi import APIRouter, HTTPException
-from datetime import datetime
 from collections import Counter
 from Pipeline.database.db import transaction
+from Pipeline.config import DATA_PATH
+from Pipeline.data.loader import load_customers
+from Pipeline.engine.analyzer import analyze
 
 router = APIRouter()
+
+
+@router.get("/engine")
+def engine_analytics():
+    customers, date_cutoff = load_customers(DATA_PATH)
+    at_risk, ml_stats, _ = analyze(customers, date_cutoff, ml_enabled=False)
+
+    risk_distribution = Counter(c.risk_level for c in at_risk)
+    rule_counts = Counter(rule for c in at_risk for rule in c.triggered_rules)
+
+    return {
+        "total_at_risk": len(at_risk),
+        "risk_distribution": dict(risk_distribution),
+        "rule_counts": dict(rule_counts),
+        "ml_stats": ml_stats,
+    }
 
 
 @router.get("/blast/{blast_id}")

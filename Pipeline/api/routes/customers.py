@@ -14,7 +14,7 @@ def _load_at_risk(ml_enabled: bool = False):
     return at_risk
 
 
-@router.get("/customers/at-risk")
+@router.get("/at-risk")
 def get_at_risk_customers(
     risk_level: Optional[str] = Query(None),
     limit: int = Query(50),
