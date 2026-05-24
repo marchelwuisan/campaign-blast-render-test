@@ -48,50 +48,9 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_blast_log_customer_id
                 ON blast_log (customer_id);
                            
-            CREATE TABLE IF NOT EXISTS promo_codes (
-                code                TEXT PRIMARY KEY,
-                customer_id         TEXT NOT NULL,
-                promo_type          TEXT NOT NULL,
-                discount_percent    REAL,
-                issued_at           TIMESTAMP NOT NULL,
-                expires_at          TIMESTAMP NOT NULL,
-                status              TEXT NOT NULL DEFAULT 'pending', -- pending | active | redeemed | cancelled
-                is_redeemed         INTEGER NOT NULL DEFAULT 0,
-                redeemed_at         TIMESTAMP
-            );
-            CREATE INDEX IF NOT EXISTS idx_promo_code_customer_id
-                ON promo_codes (customer_id);
-                           
             CREATE TABLE IF NOT EXISTS customer_blast_status (
                 customer_id         TEXT PRIMARY KEY,
                 last_sent_at        TIMESTAMP NOT NULL,
                 sent_promo_types    TEXT NOT NULL DEFAULT '' -- comma-separated
-            );
-            CREATE TABLE IF NOT EXISTS at_risk_customers (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                blast_id        TEXT NOT NULL,
-                customer_id     TEXT NOT NULL,
-                name            TEXT NOT NULL,
-                phone           TEXT NOT NULL,
-                risk_level      TEXT NOT NULL,
-                days_inactive   INTEGER NOT NULL,
-                r_score         INTEGER NOT NULL,
-                f_score         INTEGER NOT NULL,
-                m_score         INTEGER NOT NULL,
-                combined_score  INTEGER NOT NULL,
-                triggered_rules TEXT NOT NULL,
-                scored_at       TIMESTAMP NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_at_risk_blast_id
-                ON at_risk_customers (blast_id);
-
-            CREATE TABLE IF NOT EXISTS promo_assignments (
-                blast_id        TEXT NOT NULL,
-                customer_id     TEXT NOT NULL,
-                promo_type      TEXT NOT NULL,
-                promo_value     TEXT NOT NULL,
-                promo_code      TEXT NOT NULL,
-                expiry_days     INTEGER NOT NULL,
-                PRIMARY KEY (blast_id, customer_id)
             );
         """)

@@ -1,16 +1,17 @@
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
 
-from Pipeline.database.db import transaction
+from Pipeline.config import DATA_PATH
+from Pipeline.data.loader import load_customers
+from Pipeline.engine.analyzer import analyze
 
 router = APIRouter()
 
 
-def _latest_blast_id(conn) -> str | None:
-    row = conn.execute(
-        "SELECT blast_id FROM at_risk_customers ORDER BY scored_at DESC LIMIT 1"
-    ).fetchone()
-    return row["blast_id"] if row else None
+def _load_at_risk(ml_enabled: bool = False):
+    customers, date_cutoff = load_customers(DATA_PATH)
+    at_risk, _, _ = analyze(customers, date_cutoff, ml_enabled=ml_enabled)
+    return at_risk
 
 
 @router.get("/at-risk")
@@ -22,93 +23,30 @@ def get_at_risk_customers(
     order: str = Query("desc"),
     search: Optional[str] = Query(None),
 ):
-    direction = "DESC" if order == "desc" else "ASC"
-    allowed_sort = {"combined_score", "days_inactive", "risk_level", "name"}
-    if sort_by not in allowed_sort:
-        sort_by = "combined_score"
+    at_risk = _load_at_risk()
 
-    filters = []
-    params = []
+    if risk_level:
+        at_risk = [c for c in at_risk if c.risk_level == risk_level.upper()]
 
-    with transaction() as conn:
-        blast_id = _latest_blast_id(conn)
-        if not blast_id:
-            return {"total": 0, "limit": limit, "offset": offset, "results": []}
+    if search:
+        at_risk = [
+            c
+            for c in at_risk
+            if search.lower() in c.name.lower()
+            or search.lower() in c.customer_id.lower()
+        ]
 
-        filters.append("blast_id = ?")
-        params.append(blast_id)
+    reverse = order == "desc"
+    if sort_by == "combined_score":
+        at_risk.sort(key=lambda c: c.rfm.combined_score, reverse=reverse)
+    elif sort_by == "days_inactive":
+        at_risk.srt(key=lambda c: c.days_since_last_purchase, reverse=reverse)
 
-        if risk_level:
-            filters.append("risk_level = ?")
-            params.append(risk_level.upper())
-
-        if search:
-            filters.append("(name LIKE ? OR customer_id LIKE ?)")
-            params.extend([f"%{search}%", f"%{search}%"])
-
-        where = f"WHERE {' AND '.join(filters)}"
-
-        total = conn.execute(
-            f"SELECT COUNT(*) FROM at_risk_customers {where}", params
-        ).fetchone()[0]
-
-        rows = conn.execute(
-            f"""
-            SELECT * FROM at_risk_customers {where}
-            ORDER BY {sort_by} {direction}
-            LIMIT ? OFFSET ?
-            """,
-            params + [limit, offset],
-        ).fetchall()
+    paginated = at_risk[offset : offset + limit]
 
     return {
-        "total": total,
+        "total": len(at_risk),
         "limit": limit,
         "offset": offset,
-        "results": [
-            {
-                "customer_id": r["customer_id"],
-                "name": r["name"],
-                "phone": r["phone"],
-                "risk_level": r["risk_level"],
-                "days_inactive": r["days_inactive"],
-                "rfm": {
-                    "r_score": r["r_score"],
-                    "f_score": r["f_score"],
-                    "m_score": r["m_score"],
-                    "combined_score": r["combined_score"],
-                },
-                "triggered_rules": (
-                    r["triggered_rules"].split(",") if r["triggered_rules"] else []
-                ),
-            }
-            for r in rows
-        ],
-    }
-
-
-@router.get("/{customer_id}/promo")
-def get_customer_promo(customer_id: str):
-    with transaction() as conn:
-        blast_id = _latest_blast_id(conn)
-        if not blast_id:
-            raise HTTPException(status_code=404, detail="No blast has been run yet")
-
-        row = conn.execute(
-            """
-            SELECT * FROM promo_assignments
-            WHERE blast_id = ? AND customer_id = ?
-            """,
-            (blast_id, customer_id),
-        ).fetchone()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Customer not found or not at risk")
-
-    return {
-        "customer_id": customer_id,
-        "promo_type": row["promo_type"],
-        "promo_value": row["promo_value"],
-        "promo_code": row["promo_code"],
-        "expiry_days": row["expiry_days"],
+        "results": paginated,
     }

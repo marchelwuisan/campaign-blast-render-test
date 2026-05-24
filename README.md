@@ -73,7 +73,7 @@ Outputs:
 
 Must be re-run if the dataset changes or `build_features()` is modified.
 
-### 3. Test the pipeline
+### 3. Test the pipeline (optional)
 
 ```bash
 .venv/bin/python test_pipeline.py
@@ -81,6 +81,81 @@ Must be re-run if the dataset changes or `build_features()` is modified.
 
 Outputs:
 - `test_pipeline_report.json` — at-risk customer summary with risk distribution, rule counts, and sample output
+
+### 4. Run the Dashboard (optional)
+
+Install dashboard dependencies first (if not already):
+
+```bash
+.venv/bin/pip install streamlit plotly requests
+```
+
+Start both the API and the dashboard in separate terminals:
+
+```bash
+# Terminal 1 — API server
+.venv/bin/python -m uvicorn Pipeline.api.main:app --reload
+
+# Terminal 2 — Streamlit dashboard
+.venv/bin/python -m streamlit run dashboard/app.py
+```
+
+The dashboard runs at `http://localhost:8501` and connects to the API at `http://localhost:8000`.
+
+**Dashboard pages:**
+
+| Page | Description |
+|---|---|
+| Blast | Preview or trigger a blast, toggle ML, view result summary |
+| Logs | Paginated blast history with search and date filters |
+| Customers | At-risk customer list with risk level filter (engine runs once per session) |
+| Analytics | Engine overview (risk distribution, rule counts) + per-blast metrics and charts |
+
+---
+
+### 5. Run the API
+
+Install API dependencies first (if not already):
+
+```bash
+.venv/bin/pip install fastapi uvicorn python-dotenv
+```
+
+Copy the environment template and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Start the server:
+
+```bash
+.venv/bin/python -m uvicorn Pipeline.api.main:app --reload
+```
+
+The API runs at `http://localhost:8000`. Open `http://localhost:8000/docs` for the interactive Swagger UI.
+
+### 5. Send a blast
+
+Trigger a full blast run via the API:
+
+```bash
+curl -X POST http://localhost:8000/blast/send \
+  -H "Content-Type: application/json" \
+  -d '{"ml_enabled": false}'
+```
+
+Or use the Swagger UI at `/docs` — no curl required.
+
+**Blast endpoints:**
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/blast/preview` | Dry-run — returns messages that would be sent, nothing dispatched |
+| `POST` | `/blast/send` | Execute full blast — runs pipeline, writes to DB |
+| `GET` | `/blast/logs` | Paginated blast history |
+| `GET` | `/customers/at-risk` | Scored at-risk customer list |
+| `GET` | `/analytics/blast/{blast_id}` | Metrics for a specific blast run |
 
 ---
 
@@ -97,11 +172,13 @@ Key settings:
 | Variable | Default | Description |
 |---|---|---|
 | `RFM_WINDOW_DAYS` | 180 | Days of transaction history used for RFM scoring |
-| `RFM_AT_RISK_THRESHOLD` | 8 | Combined RFM score below this = at-risk |
-| `INACTIVITY_THRESHOLD_DAYS` | 30 | Days inactive before R01 fires |
+| `RFM_AT_RISK_THRESHOLD` | 6 | Combined RFM score below this = at-risk |
+| `INACTIVITY_THRESHOLD_DAYS` | 300 | Days inactive before R01 fires |
 | `HIGH_VALUE_SPEND_THRESHOLD` | 1500.0 | Spend threshold for R03 (high-value lapse) |
 | `MAX_BLAST_SIZE` | 500 | Maximum customers per blast |
-| `ML_CHURN_THRESHOLD` | 0.6 | Minimum churn probability to flag a customer |
+| `BLAST_COOLDOWN_DAYS` | 7 | Minimum days between blasts to the same customer |
+| `ML_CHURN_THRESHOLD` | 0.8 | Minimum churn probability to flag a customer |
+| `SENDER_MODE` | `mock` | `mock` logs to console; `meta` sends via Meta Cloud API |
 
 ---
 
@@ -139,6 +216,7 @@ WA-Blast/
 |---|---|---|
 | 1 | `data/loader.py` | Load CSV, validate, normalize phones, build Customer objects |
 | 2 | `engine/analyzer.py` | Score customers — rules → RFM → ML → rank at-risk list |
-| 3 | _(coming soon)_ | Promo assignment |
-| 4 | _(coming soon)_ | Message construction |
-| 5 | _(coming soon)_ | WhatsApp dispatch |
+| 3 | `promo/mapping.py` | Assign discount promo per customer based on risk level |
+| 4 | `messaging/constructor.py` | Build WhatsApp message from customer + promo |
+| 5 | `messaging/mock_sender.py` | Dispatch messages (mock logs to console; swap to MetaSender for real sends) |
+| 6 | `api/` | FastAPI layer — exposes full pipeline as REST endpoints |

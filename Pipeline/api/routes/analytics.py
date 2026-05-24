@@ -1,8 +1,27 @@
 from fastapi import APIRouter, HTTPException
-from datetime import datetime
+from collections import Counter
 from Pipeline.database.db import transaction
+from Pipeline.config import DATA_PATH
+from Pipeline.data.loader import load_customers
+from Pipeline.engine.analyzer import analyze
 
 router = APIRouter()
+
+
+@router.get("/engine")
+def engine_analytics():
+    customers, date_cutoff = load_customers(DATA_PATH)
+    at_risk, ml_stats, _ = analyze(customers, date_cutoff, ml_enabled=False)
+
+    risk_distribution = Counter(c.risk_level for c in at_risk)
+    rule_counts = Counter(rule for c in at_risk for rule in c.triggered_rules)
+
+    return {
+        "total_at_risk": len(at_risk),
+        "risk_distribution": dict(risk_distribution),
+        "rule_counts": dict(rule_counts),
+        "ml_stats": ml_stats,
+    }
 
 
 @router.get("/blast/{blast_id}")
@@ -21,47 +40,17 @@ def blast_analytics(blast_id: str):
     sent = sum(1 for r in rows if r["status"] in ("sent", "mocked"))
     failed = sum(1 for r in rows if r["status"] == "failed")
 
-    promo_codes = [r["promo_code"] for r in rows if r["promo_code"]]
+    promo_breakdown = Counter(r["promo_code"] for r in rows if r["promo_code"])
 
-    redeemed = 0
-    time_to_redeem_seconds = []
-
-    if promo_codes:
-        with transaction() as conn:
-            placeholders = ",".join(["?"] * len(promo_codes))
-            code_rows = conn.execute(
-                f"SELECT * FROM promo_codes WHERE code IN ({placeholders})",
-                promo_codes,
-            ).fetchall()
-            code_rows = [dict(r) for r in code_rows]
-
-        redeemed = sum(1 for r in code_rows if r["is_redeemed"])
-
-        for r in code_rows:
-            if r["is_redeemed"] and r["redeemed_at"] and r["issued_at"]:
-                delta = (
-                    datetime.fromisoformat(r["redeemed_at"])
-                    - datetime.fromisoformat(r["issued_at"])
-                ).total_seconds()
-                time_to_redeem_seconds.append(delta)
-
-        avg_time_to_redeem = (
-            round(sum(time_to_redeem_seconds) / len(time_to_redeem_seconds))
-            if time_to_redeem_seconds
-            else None
-        )
-
-        return {
-            "blast_id": blast_id,
-            "total_sent": sent,
-            "total_failed": failed,
-            "total": total,
-            "redemption_rate": round(redeemed / sent * 100, 1) if sent else 0,
-            "redeemed_count": redeemed,
-            "avg_time_to_redeem_seconds": avg_time_to_redeem,
-            "failures": [
-                {"customer_id": r["customer_id"], "reason": r["error_reason"]}
-                for r in rows
-                if r["status"] == "failed"
-            ],
-        }
+    return {
+        "blast_id": blast_id,
+        "total": total,
+        "total_sent": sent,
+        "total_failed": failed,
+        "promo_breakdown": dict(promo_breakdown),
+        "failures": [
+            {"customer_id": r["customer_id"], "reason": r["error_reason"]}
+            for r in rows
+            if r["status"] == "failed"
+        ],
+    }

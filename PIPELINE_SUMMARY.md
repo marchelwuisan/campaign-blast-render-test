@@ -25,8 +25,8 @@ WA-Blast/
 │   │   └── training/                # Offline training scripts (profile + temporal)
 │   │
 │   ├── promo/
-│   │   ├── mapping.py               # Rule-based promo assignment
-│   │   └── schema.py                # PromoOffer dataclass
+│   │   ├── mapping.py               # Rule-based promo assignment (4 tiers)
+│   │   └── schema.py                # PromoOffer, CustomerMessage dataclasses
 │   │
 │   ├── messaging/
 │   │   ├── base.py                  # BaseSender abstract + SendResult
@@ -36,14 +36,13 @@ WA-Blast/
 │   │
 │   ├── database/
 │   │   ├── db.py                    # SQLite connection, transaction, schema init
-│   │   └── wa_blast.db              # SQLite database (5 tables)
+│   │   └── wa_blast.db              # SQLite database (2 tables)
 │   │
 │   └── api/
 │       ├── main.py                  # FastAPI app entry point
 │       └── routes/
-│           ├── customers.py         # At-risk list, per-customer promo
+│           ├── customers.py         # At-risk customer list
 │           ├── blast.py             # Preview, send, logs
-│           ├── promo_codes.py       # Validate, redeem
 │           └── analytics.py         # Per-blast metrics
 │
 ├── test_pipeline.py                 # Standalone test runner for Stages 1–5
@@ -59,7 +58,7 @@ WA-Blast/
 
 **Function:** `load_customers(csv_path) -> (list[Customer], date_cutoff)`
 
-Reads the canonical CSV, validates required columns, deduplicates transactions by `(customer_id, purchase_date, order_value)`, parses dates and normalizes phone numbers to E.164, filters out customers younger than `MIN_CUSTOMER_AGE_DAYS`, and groups transactions under each `Customer`. Skipped records are written to `logs/skipped.jsonl` with a reason.
+Reads the canonical CSV, validates required columns, deduplicates transactions by `(customer_id, purchase_date, order_value)`, parses dates and normalizes phone numbers to E.164, filters out customers newer than `MIN_CUSTOMER_AGE_DAYS`, and groups transactions under each `Customer`. Skipped records are written to `logs/skipped.jsonl` with a reason.
 
 **Dataclasses:**
 - `Customer` — `customer_id`, `customer_name`, `phone_number`, `created_at`, optional `gender`, `age`, plus a list of `Transaction` and computed properties (`last_purchase_date`, `total_spend`, `purchase_count`, `avg_order_value`, `top_category`)
@@ -73,19 +72,21 @@ Reads the canonical CSV, validates required columns, deduplicates transactions b
 
 **Function:** `analyze(customers, date_cutoff, ml_enabled) -> (at_risk, ml_stats, population_rfm_stats)`
 
-Execution order (runtime-optimized):
-1. **Rules first** — `evaluate_rules()` runs R01–R04 using fixed config thresholds. Customers caught by rules are confirmed HIGH risk.
-2. **RFM scoring** — percentile-based quintiles (1–5) on R/F/M dimensions; `combined_score = R + F + M`.
-3. **ML predictor** (if `ml_enabled=true`) — scores only customers **not** already flagged by rules.
-4. **Signal combination** — produces `AtRiskCustomer` objects with `risk_level` (HIGH / MEDIUM / LOW), `triggered_rules`, `days_since_last_purchase`, `rfm` scores, `spend_summary`.
+Execution order:
+1. **Rules first** — `evaluate_rules()` runs R01–R04 using fixed config thresholds
+2. **RFM scoring** — percentile-based quintiles (1–5); `combined_score = R + F + M`
+3. **ML predictor** (if `ml_enabled=true`) — scores only customers not already flagged by rules
+4. **Signal combination** — produces ranked `AtRiskCustomer` list
 
 **Rules:**
 | ID | Name | Condition |
 |---|---|---|
-| R01 | Long Inactivity | No purchase in last `INACTIVITY_THRESHOLD_DAYS` |
-| R02 | Frequency Drop | Current period count < `FREQUENCY_DROP_THRESHOLD` × prior period count |
-| R03 | High-Value Lapse | Total spend ≥ `HIGH_VALUE_SPEND_THRESHOLD` + inactive > `HIGH_VALUE_LAPSE_DAYS` |
+| R01 | Long Inactivity | No purchase in last `INACTIVITY_THRESHOLD_DAYS` (300) days |
+| R02 | Frequency Drop | Current period count < `FREQUENCY_DROP_THRESHOLD` (0.5) × prior period |
+| R03 | High-Value Lapse | Total spend ≥ `HIGH_VALUE_SPEND_THRESHOLD` (1500.0) + inactive > `HIGH_VALUE_LAPSE_DAYS` (30) |
 | R04 | Single Purchase | Only 1 purchase ever recorded |
+
+**`AtRiskCustomer` fields:** `customer_id`, `name`, `phone`, `risk_level` (HIGH/MEDIUM/LOW), `triggered_rules`, `rfm` (r/f/m/combined scores), `days_since_last_purchase`, `spend_summary` (total_spend, avg_order_value, top_category)
 
 ---
 
@@ -95,17 +96,25 @@ Execution order (runtime-optimized):
 
 **Function:** `assign_promo(customer: AtRiskCustomer) -> PromoOffer`
 
-Deterministic rule-based mapping table:
+4-tier static discount mapping:
 
-| Condition | Promo Type | Code (template) |
-|---|---|---|
-| HIGH risk + spend ≥ threshold | `discount_30` | `BACK30` |
-| HIGH risk + regular spend | `discount_20` | `BACK20` |
-| MEDIUM risk + R02 fired | `ship_discount_15` | `SHIP15` |
-| MEDIUM risk + R04 fired | `bogo` | `BOGO1` |
-| LOW risk (default) | `points_2x` | `POINTS2X` |
+| Condition | Promo Type | Code | Value |
+|---|---|---|---|
+| HIGH risk + spend ≥ 1500 | `discount_20` | `DISC20` | 20% off |
+| HIGH risk | `discount_15` | `DISC15` | 15% off |
+| MEDIUM risk | `discount_10` | `DISC10` | 10% off |
+| LOW risk (default) | `discount_5` | `DISC5` | 5% off |
 
-The template code (`BACK30` etc.) identifies the promo *type*. The actual unique per-customer code (`WA-XXXXXX`) is generated downstream in the API layer when the blast is dispatched.
+**`PromoOffer` fields:** `promo_type`, `promo_value`, `promo_code`, `expiry_days`
+
+**`CustomerMessage`** — container that flows through Stages 3–5:
+```python
+@dataclass
+class CustomerMessage:
+    customer: AtRiskCustomer
+    promo: PromoOffer
+    message: Optional[WhatsAppMessage] = None  # filled by Stage 4
+```
 
 ---
 
@@ -114,8 +123,8 @@ The template code (`BACK30` etc.) identifies the promo *type*. The actual unique
 **Files:** `messaging/constructor.py`
 
 **Functions:**
-- `construct_message(customer, promo) -> WhatsAppMessage` — injects slots into the re-engagement template
-- `validate_message(msg) -> str | None` — returns error string or `None`
+- `construct_message(customer, promo) -> WhatsAppMessage` — injects slots into re-engagement template, attaches to `CustomerMessage.message`
+- `validate_message(msg) -> str | None` — non-empty slots + ≤ 1024 char body
 
 **Template (POC, plain text):**
 ```
@@ -126,19 +135,19 @@ Use code {code_id} — valid for {days_valid} days.
 See you soon!
 ```
 
-`WhatsAppMessage` carries `to`, `body`, `customer_id`, `promo_code`, `template_name`, `language_code`, `template_params`. Validation enforces non-empty slots and ≤1024 char body length.
+**`WhatsAppMessage` fields:** `to`, `body`, `customer_id`, `promo_code`, `template_name`, `language_code`, `template_params`
 
 ---
 
 ## Stage 5 — Dispatch
 
-**Files:** `messaging/base.py`, `messaging/mock_sender.py`, `messaging/meta_sender.py` (stub)
+**Files:** `messaging/base.py`, `messaging/mock_sender.py`
 
 **Interface:** `BaseSender.send(message, customer_id, blast_id) -> SendResult`
 
-`MockSender` prints message preview to console and returns `SendResult(status="mocked", ...)`. It owns **no DB logic** — `blast_log` persistence is handled by the API layer so DB transactions can be coordinated atomically.
+`MockSender` prints the message preview to console and returns `SendResult(status="mocked")`. All DB persistence (blast_log, customer_blast_status) is handled by the API layer — the sender owns no DB logic.
 
-`MetaSender` exists as a placeholder for the production swap. Switching senders is a single config change (`SENDER_MODE=meta`).
+`MetaSender` is a stub for the production Meta Cloud API swap — switching is a single config change (`SENDER_MODE=meta`).
 
 ---
 
@@ -147,59 +156,69 @@ See you soon!
 **File:** `database/db.py`
 
 **Functions:**
-- `get_connection()` — opens SQLite connection with `WAL` journaling, `Row` factory, foreign keys ON, creates DB file if missing
-- `transaction()` — context manager: commits on success, rolls back on exception, always closes
-- `init_db()` — creates all tables idempotently (called once on FastAPI startup)
+- `get_connection()` — opens SQLite with WAL journaling, Row factory, foreign keys ON
+- `transaction()` — context manager: commits on success, rolls back on exception
+- `init_db()` — idempotent table creation (called on FastAPI startup)
 
-**Tables:**
+**Tables (2):**
 
 | Table | Purpose |
 |---|---|
-| `blast_log` | Every dispatch attempt — `blast_id`, `customer_id`, `phone`, `template_name`, `promo_code`, `status` (pending → mocked/sent/failed), `sent_at` |
-| `promo_codes` | Unique `WA-XXXXXX` codes — `customer_id`, `promo_type`, `issued_at`, `expires_at`, `status`, `is_redeemed`, `redeemed_at` |
-| `customer_blast_status` | Cooldown + promo dedup — `customer_id` (PK), `last_sent_at`, `sent_promo_types` (comma-separated) |
-| `at_risk_customers` | Snapshot of scored at-risk list per blast run — full RFM, risk level, triggered rules |
-| `promo_assignments` | Promo assigned per customer per blast |
-
-`at_risk_customers` and `promo_assignments` are read-only outputs of a blast — `GET /customers/*` endpoints query these directly instead of re-running the pipeline.
+| `blast_log` | Every dispatch attempt — `blast_id`, `customer_id`, `phone`, `template_name`, `promo_code`, `status` (mocked/sent/failed), `error_code`, `error_reason`, `sent_at` |
+| `customer_blast_status` | Cooldown + promo history — `customer_id` (PK), `last_sent_at`, `sent_promo_types` (comma-separated) |
 
 ---
 
 ## Stage 6 — API Layer (FastAPI)
 
-**File:** `api/main.py` — mounts all routers, calls `init_db()` via `lifespan`
-
-### `routes/customers.py`
-- `GET /customers/at-risk` — paginated at-risk list from `at_risk_customers` (latest blast). Supports `risk_level`, `search`, `sort_by`, `order`, `limit`, `offset`.
-- `GET /customers/{id}/promo` — returns the customer's promo from `promo_assignments` (latest blast).
+**File:** `api/main.py` — mounts all routers, calls `init_db()` via lifespan
 
 ### `routes/blast.py`
-- `POST /blast/preview` — dry-run, returns what would be sent; no DB writes.
-- `POST /blast/send` — full execution:
-  1. Run pipeline (`_run_pipeline`)
-  2. Apply cooldown filter (`_apply_cooldown` — skips customers within `BLAST_COOLDOWN_DAYS`)
-  3. Pre-flight validation — abort entire blast if any message fails
-  4. **First transaction:** insert `at_risk_customers`, `promo_assignments`, `promo_codes` (with unique `WA-XXXXXX` codes), `blast_log` (as `pending`)
-  5. **Send loop:** dispatch each message, update `blast_log` status, upsert `customer_blast_status`
-- `GET /blast/logs` — paginated blast history with `since`, `search`, `sort_by`, `order`.
 
-### `routes/promo_codes.py`
-- `GET /promo-codes/validate/{code}` — checks existence, lifecycle, expiry. Returns discount details or rejection reason (`not_found`, `pending`, `cancelled`, `already_redeemed`, `expired`).
-- `POST /promo-codes/redeem/{code}` — marks code as redeemed if `status=active` and not expired.
+**Helper functions (staged pipeline):**
+
+| Function | Job |
+|---|---|
+| `_run_engine(ml_enabled)` | `load_customers` + `analyze` → returns `at_risk` list |
+| `_apply_cooldown(at_risk)` | Queries `customer_blast_status`, drops customers within `BLAST_COOLDOWN_DAYS` |
+| `assign_promos(at_risk)` | Calls `assign_promo()` per customer → returns `list[CustomerMessage]` |
+| `construct_messages(cms)` | Calls `construct_message()` per item, fills `cm.message` |
+| `validate_messages(cms)` | Pre-flight: checks slots + length → returns `{customer_id: error}` dict |
+| `send_blast(cms, blast_id)` | `MockSender.send()` per message, writes `blast_log`, upserts `customer_blast_status` |
+
+**Endpoints:**
+
+- `POST /blast/preview` `{ ml_enabled }` — dry-run, returns message previews, no DB writes
+- `POST /blast/send` `{ ml_enabled }` — full execution, aborts with 400 if pre-flight fails
+- `GET /blast/logs` — paginated `blast_log` with `limit`, `offset`, `since`, `search`, `sort_by`, `order`
+
+**`POST /blast/send` execution order:**
+```
+_run_engine → _apply_cooldown → assign_promos → construct_messages
+→ validate_messages (abort if errors)
+→ blast_id = uuid4()
+→ send_blast: MockSender + INSERT blast_log + UPSERT customer_blast_status
+→ return { blast_id, total, total_sent, total_failed, sender_mode }
+```
+
+### `routes/customers.py`
+
+- `GET /customers/at-risk` — re-runs engine on every call; supports `risk_level`, `search`, `sort_by`, `order`, `limit`, `offset`
 
 ### `routes/analytics.py`
-- `GET /analytics/blast/{blast_id}` — metrics for a blast run: total sent/failed, redemption rate, avg time to redeem, list of failures with reasons.
+
+- `GET /analytics/blast/{blast_id}` — reads `blast_log` for the given blast: `total`, `total_sent`, `total_failed`, `promo_breakdown` (count per promo code), `failures` list
 
 ---
 
-## Configuration
+## Configuration Reference
 
-All knobs live in `Pipeline/config.py`, overridable via `.env`. Key values:
+All values live in `Pipeline/config.py`, overridable via `.env`.
 
 | Param | Default | Used in |
 |---|---|---|
 | `DATA_PATH` | `Pipeline/transactions.csv` | Stage 1 |
-| `DB_PATH` | `Pipeline/database/wa_blast.db` | Database layer |
+| `DB_PATH` | `Pipeline/database/wa_blast.db` | Database |
 | `MIN_CUSTOMER_AGE_DAYS` | 14 | Stage 1 |
 | `RFM_WINDOW_DAYS` | 180 | Stage 2 |
 | `RFM_AT_RISK_THRESHOLD` | 6 | Stage 2 |
@@ -207,7 +226,8 @@ All knobs live in `Pipeline/config.py`, overridable via `.env`. Key values:
 | `FREQUENCY_DROP_THRESHOLD` | 0.5 | R02 |
 | `HIGH_VALUE_SPEND_THRESHOLD` | 1500.0 | R03 |
 | `HIGH_VALUE_LAPSE_DAYS` | 30 | R03 |
-| `MAX_BLAST_SIZE` | 10000 | Stage 5 |
+| `THRESHOLD_DRIFT_TOLERANCE` | 0.1 | R03 |
+| `MAX_BLAST_SIZE` | 500 | Stage 2 |
 | `BLAST_COOLDOWN_DAYS` | 7 | Stage 3 |
 | `PROMO_EXPIRY_DAYS` | 7 | Stage 3 |
 | `SENDER_MODE` | `mock` | Stage 5 |
@@ -219,30 +239,40 @@ All knobs live in `Pipeline/config.py`, overridable via `.env`. Key values:
 ## Runtime Flow (`POST /blast/send`)
 
 ```
-Request → _run_pipeline()
-              ├─ load_customers(DATA_PATH)              [Stage 1]
-              ├─ analyze(customers, cutoff, ml_enabled) [Stage 2]
-              ├─ assign_promo(c) for c in at_risk       [Stage 3]
-              └─ construct_message(c, promo)            [Stage 4]
-       ↓
-       _apply_cooldown(at_risk)
-              └─ query customer_blast_status, drop on-cooldown
-       ↓
-       validate_message() pre-flight
-              └─ abort blast with 400 if any failure
-       ↓
-       Transaction 1 — DB state writes
-              ├─ INSERT at_risk_customers
-              ├─ INSERT promo_assignments
-              ├─ INSERT OR IGNORE promo_codes (WA-XXXXXX, status=active)
-              └─ INSERT blast_log (status=pending)
-       ↓
-       Send loop — per customer
-              ├─ MockSender.send() → SendResult         [Stage 5]
-              ├─ UPDATE blast_log SET status
-              └─ UPSERT customer_blast_status
-       ↓
-       Response { blast_id, total, sent, failed, sender_mode }
+Request { ml_enabled }
+   │
+   ▼
+_run_engine()
+   ├─ load_customers(DATA_PATH)         [Stage 1]
+   └─ analyze(customers, cutoff)        [Stage 2: RFM + rules + ML]
+   │
+   ▼
+_apply_cooldown(at_risk)
+   └─ drop customers in customer_blast_status within BLAST_COOLDOWN_DAYS
+   │
+   ▼
+assign_promos(at_risk) → list[CustomerMessage]
+   └─ assign_promo(c) per customer      [Stage 3]
+   │
+   ▼
+construct_messages(cms) → list[CustomerMessage]
+   └─ construct_message(c, promo)       [Stage 4]
+   │
+   ▼
+validate_messages(cms)
+   └─ abort with HTTP 400 if any message fails
+   │
+   ▼
+blast_id = uuid4()
+   │
+   ▼
+send_blast(cms, blast_id)              [Stage 5]
+   ├─ MockSender.send() per message
+   ├─ INSERT blast_log (status=mocked/sent/failed)
+   └─ UPSERT customer_blast_status (last_sent_at, sent_promo_types)
+   │
+   ▼
+Response { blast_id, total, total_sent, total_failed, sender_mode }
 ```
 
 ---
@@ -250,16 +280,15 @@ Request → _run_pipeline()
 ## Current Status
 
 **Implemented and verified:**
-- All 5 pipeline stages (data → analysis → promo → message → dispatch)
-- Full SQLite persistence (5 tables)
-- Full FastAPI surface (8 endpoints)
-- Cooldown filtering via `customer_blast_status`
-- Unique per-customer promo codes
-- Pre-flight validation with full-blast abort
+- Stages 1–5 pipeline (data → analysis → promo → message → dispatch)
+- 2-table SQLite persistence (`blast_log`, `customer_blast_status`)
+- 5 FastAPI endpoints across 3 route files
+- Cooldown filtering (7-day default)
+- Pre-flight validation with full-blast abort on failure
+- 4-tier static promo discount codes (DISC5/10/15/20)
 
-**Pending:**
-- Stage 3 promo deduplication via `sent_promo_types` (avoid repeating promo types per customer)
-- `MetaSender` real implementation
+**Pending (pre-production):**
+- `MetaSender` real implementation (Meta Cloud API)
 - Stage 7 Streamlit dashboard (optional)
-- Consent / opt-out mechanism (deferred — required before production)
-- API authentication
+- Consent / opt-out mechanism (legal requirement before real use)
+- API authentication (`API_KEY` middleware)
