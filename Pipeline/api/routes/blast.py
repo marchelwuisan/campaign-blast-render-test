@@ -12,10 +12,18 @@ from Pipeline.engine.analyzer import analyze
 from Pipeline.promo.mapping import assign_promo
 from Pipeline.promo.schema import CustomerMessage
 from Pipeline.messaging.constructor import construct_message, validate_message
+from Pipeline.messaging.base import BaseSender
 from Pipeline.messaging.mock_sender import MockSender
+from Pipeline.messaging.meta_sender import MetaSender
 from Pipeline.database.db import transaction
 
 router = APIRouter()
+
+
+def _get_sender() -> BaseSender:
+    if SENDER_MODE == "meta":
+        return MetaSender()
+    return MockSender()
 
 
 def _run_engine(ml_enabled: bool = False):
@@ -64,7 +72,7 @@ def validate_messages(customer_messages):
 
 
 def send_blast(customer_messages, blast_id):
-    sender = MockSender()  # Change on production
+    sender = _get_sender()
     results = []
     for cm in customer_messages:
         result = sender.send(cm.message, cm.customer.customer_id, blast_id)
