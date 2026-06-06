@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from Pipeline.database.db import init_db
-from Pipeline.api.routes import customers, blast, analytics
+from Pipeline.api.routes import customers, blast, analytics, templates
 
 
 @asynccontextmanager
@@ -20,3 +20,4 @@ app = FastAPI(
 app.include_router(customers.router, prefix="/customers", tags=["Customers"])
 app.include_router(blast.router, prefix="/blast", tags=["Blast"])
 app.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
+app.include_router(templates.router, prefix="/templates", tags=["Templates"])
