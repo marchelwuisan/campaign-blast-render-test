@@ -40,6 +40,13 @@ def init_db():
                 received_at TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS outgoing_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                recipient TEXT NOT NULL,
+                sent_at TEXT NOT NULL
+            )
+        """)
 
 
 def save_incoming_message(sender: str, content: str, received_at: str):
@@ -47,6 +54,14 @@ def save_incoming_message(sender: str, content: str, received_at: str):
         conn.execute(
             "INSERT INTO incoming_messages (sender, content, received_at) VALUES (?, ?, ?)",
             (sender, content, received_at),
+        )
+
+
+def save_outgoing_message(recipient: str, sent_at: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO outgoing_messages (recipient, sent_at) VALUES (?, ?)",
+            (recipient, sent_at),
         )
 
 
@@ -92,7 +107,16 @@ def receive():
             print(f"[webhook] opt-out from {sender}: flagged {updated} customer row(s)")
 
     for status in value.get("statuses", []):
-        print(f"[webhook] status {status.get('id')}: {status.get('status')}")
+        wamid = status.get("id")
+        status_val = status.get("status")
+        print(f"[webhook] status {wamid}: {status_val}")
+
+        if status_val == "sent":
+            recipient = status.get("recipient_id", "")
+            ts = status.get("timestamp")
+            sent_at = datetime.fromtimestamp(int(ts), tz=timezone.utc).isoformat() if ts else datetime.now(timezone.utc).isoformat()
+            save_outgoing_message(recipient, sent_at)
+            print(f"[webhook] logged outgoing to {recipient} at {sent_at}")
 
     return "OK", 200
 
