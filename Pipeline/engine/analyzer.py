@@ -176,13 +176,6 @@ def analyze(
     # --- Step 6: sort by risk level, then by days since last purchase (most inactive first) ---
     at_risk.sort(key=lambda c: (RISK_ORDER[c.risk_level], -c.days_since_last_purchase))
 
-    # --- Step 7: apply blast cap ---
-    # if len(at_risk) > MAX_BLAST_SIZE:
-    #     at_risk = sorted(at_risk, key=lambda c: -c.rfm.combined_score)[:MAX_BLAST_SIZE]
-    #     at_risk.sort(
-    #         key=lambda c: (RISK_ORDER[c.risk_level], -c.days_since_last_purchase)
-    #     )
-
     all_scores = [r.combined_score for r in rfm_map.values()]
     population_rfm_stats = {
         "total": len(all_scores),
