@@ -11,10 +11,15 @@ from Pipeline.config import DATA_PATH
 from Pipeline.data.loader import load_customers
 from Pipeline.engine.analyzer import analyze
 from Pipeline.database.db import transaction
+from Pipeline.promo.mapping import assign_promo
 
 REQUIRED_COLUMNS = {
-    "customer_id", "phone_number", "created_at",
-    "purchase_date", "order_value", "product_category",
+    "customer_id",
+    "phone_number",
+    "created_at",
+    "purchase_date",
+    "order_value",
+    "product_category",
 }
 
 _META_PATH = Path(DATA_PATH).parent / "dataset_meta.json"
@@ -55,7 +60,9 @@ def get_dataset_status():
 
     if exists and not meta.get("uploaded_at"):
         mtime = os.path.getmtime(DATA_PATH)
-        result["last_uploaded"] = datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+        result["last_uploaded"] = datetime.fromtimestamp(
+            mtime, tz=timezone.utc
+        ).isoformat()
 
     return result
 
@@ -97,11 +104,13 @@ async def upload_dataset(file: UploadFile = File(...)):
         _META_PATH.unlink()
 
     uploaded_at = datetime.now(tz=timezone.utc).isoformat()
-    _write_meta({
-        "uploaded_at": uploaded_at,
-        "original_filename": file.filename,
-        "row_count": row_count,
-    })
+    _write_meta(
+        {
+            "uploaded_at": uploaded_at,
+            "original_filename": file.filename,
+            "row_count": row_count,
+        }
+    )
 
     return {
         "status": "uploaded",
@@ -133,31 +142,46 @@ def analyze_dataset(ml_enabled: bool = False):
                 rfm_r_score, rfm_f_score, rfm_m_score, rfm_combined_score,
                 days_since_last_purchase, total_spend, avg_order_value,
                 top_category, triggered_rules, churn_probability,
-                ml_enabled, analyzed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ml_enabled, analyzed_at, promo_type, promo_code, promo_value, promo_expiry_days
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
-                    c.customer_id, c.name, c.phone, c.gender, c.age, c.risk_level,
-                    c.rfm.r_score, c.rfm.f_score, c.rfm.m_score, c.rfm.combined_score,
+                    c.customer_id,
+                    c.name,
+                    c.phone,
+                    c.gender,
+                    c.age,
+                    c.risk_level,
+                    c.rfm.r_score,
+                    c.rfm.f_score,
+                    c.rfm.m_score,
+                    c.rfm.combined_score,
                     c.days_since_last_purchase,
-                    c.spend_summary.total_spend, c.spend_summary.avg_order_value,
+                    c.spend_summary.total_spend,
+                    c.spend_summary.avg_order_value,
                     c.spend_summary.top_category,
                     json.dumps(c.triggered_rules),
                     c.churn_probability,
                     int(ml_enabled),
                     analyzed_at,
+                    (promo := assign_promo(c)).promo_type,
+                    promo.promo_code,
+                    promo.promo_value,
+                    promo.expiry_days,
                 )
                 for c in at_risk
             ],
         )
 
     meta = _read_meta()
-    meta.update({
-        "analyzed_at": analyzed_at,
-        "ml_enabled": ml_enabled,
-        "analyzed_customer_count": len(at_risk),
-    })
+    meta.update(
+        {
+            "analyzed_at": analyzed_at,
+            "ml_enabled": ml_enabled,
+            "analyzed_customer_count": len(at_risk),
+        }
+    )
     _write_meta(meta)
 
     return {

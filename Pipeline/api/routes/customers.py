@@ -85,28 +85,37 @@ def get_at_risk_customers(
     results = []
     for r in rows:
         d = dict(r)
-        results.append({
-            "customer_id": d["customer_id"],
-            "name": d["name"],
-            "phone": d["phone"],
-            "gender": d["gender"],
-            "age": d["age"],
-            "risk_level": d["risk_level"],
-            "triggered_rules": json.loads(d["triggered_rules"] or "[]"),
-            "days_since_last_purchase": d["days_since_last_purchase"],
-            "churn_probability": d["churn_probability"],
-            "rfm": {
-                "r_score": d["rfm_r_score"],
-                "f_score": d["rfm_f_score"],
-                "m_score": d["rfm_m_score"],
-                "combined_score": d["rfm_combined_score"],
-            },
-            "spend_summary": {
-                "total_spend": d["total_spend"],
-                "avg_order_value": d["avg_order_value"],
-                "top_category": d["top_category"],
-            },
-        })
+
+        results.append(
+            {
+                "customer_id": d["customer_id"],
+                "name": d["name"],
+                "phone": d["phone"],
+                "gender": d["gender"],
+                "age": d["age"],
+                "risk_level": d["risk_level"],
+                "triggered_rules": json.loads(d["triggered_rules"] or "[]"),
+                "days_since_last_purchase": d["days_since_last_purchase"],
+                "churn_probability": d["churn_probability"],
+                "rfm": {
+                    "r_score": d["rfm_r_score"],
+                    "f_score": d["rfm_f_score"],
+                    "m_score": d["rfm_m_score"],
+                    "combined_score": d["rfm_combined_score"],
+                },
+                "spend_summary": {
+                    "total_spend": d["total_spend"],
+                    "avg_order_value": d["avg_order_value"],
+                    "top_category": d["top_category"],
+                },
+                "promo": {
+                    "promo_type": d["promo_type"],
+                    "promo_code": d["promo_code"],
+                    "promo_value": d["promo_value"],
+                    "expiry_days": d["promo_expiry_days"],
+                },
+            }
+        )
 
     return {
         "total": total,

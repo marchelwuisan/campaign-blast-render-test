@@ -74,7 +74,11 @@ def init_db() -> None:
                 triggered_rules          TEXT,
                 churn_probability        REAL,
                 ml_enabled               INTEGER NOT NULL DEFAULT 0,
-                analyzed_at              TIMESTAMP NOT NULL
+                analyzed_at              TIMESTAMP NOT NULL,
+                promo_type               TEXT,
+                promo_code               TEXT,
+                promo_value              TEXT,
+                promo_expiry_days        INTEGER
             );
             CREATE INDEX IF NOT EXISTS idx_analyzed_risk
                 ON analyzed_customers (risk_level);
