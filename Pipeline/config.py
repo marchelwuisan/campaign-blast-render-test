@@ -37,6 +37,8 @@ MAX_DISCOUNT_PERCENT = int(os.getenv("MAX_DISCOUNT_PERCENT", 30))
 SENDER_MODE = os.getenv("SENDER_MODE", "mock")  # "mock" | "meta"
 WA_ACCESS_TOKEN = os.getenv("WA_ACCESS_TOKEN", "")
 WA_PHONE_NUMBER_ID = os.getenv("WA_PHONE_NUMBER_ID", "")
+WA_BUSINESS_ACCOUNT_ID = os.getenv("WA_BUSINESS_ACCOUNT_ID", "")  # WABA ID — for template CRUD
+WA_GRAPH_API_VERSION = os.getenv("WA_GRAPH_API_VERSION", "v25.0")
 
 # --- ML ---
 ML_MODEL_PATH = os.getenv(
