@@ -55,4 +55,31 @@ def init_db() -> None:
                 phone_number        TEXT,
                 is_unsubscribe      INTEGER NOT NULL DEFAULT 0
             );
+
+            CREATE TABLE IF NOT EXISTS analyzed_customers (
+                customer_id              TEXT PRIMARY KEY,
+                name                     TEXT,
+                phone                    TEXT,
+                gender                   TEXT,
+                age                      INTEGER,
+                risk_level               TEXT,
+                rfm_r_score              INTEGER,
+                rfm_f_score              INTEGER,
+                rfm_m_score              INTEGER,
+                rfm_combined_score       INTEGER,
+                days_since_last_purchase INTEGER,
+                total_spend              REAL,
+                avg_order_value          REAL,
+                top_category             TEXT,
+                triggered_rules          TEXT,
+                churn_probability        REAL,
+                ml_enabled               INTEGER NOT NULL DEFAULT 0,
+                analyzed_at              TIMESTAMP NOT NULL,
+                promo_type               TEXT,
+                promo_code               TEXT,
+                promo_value              TEXT,
+                promo_expiry_days        INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS idx_analyzed_risk
+                ON analyzed_customers (risk_level);
         """)

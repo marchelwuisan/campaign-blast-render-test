@@ -156,31 +156,6 @@ def blast_send(body: BlastRequest):
     }
 
 
-@router.post("/preview")
-def blast_preview(body: BlastRequest):
-    at_risk = _run_engine(body.ml_enabled)
-    at_risk = _apply_cooldown(at_risk)
-    at_risk = _filter_unsubscribed(at_risk)
-    customer_messages = assign_promos(at_risk)
-    customer_messages = construct_messages(customer_messages)
-    errors = validate_messages(customer_messages)
-
-    return {
-        "total": len(customer_messages),
-        "validation_errors": errors,
-        "messages": [
-            {
-                "customer_id": cm.customer.customer_id,
-                "phone": cm.customer.phone,
-                "promo_code": cm.promo.promo_code,
-                "body_preview": cm.message.body,
-                "sent": False,
-            }
-            for cm in customer_messages
-        ],
-    }
-
-
 @router.get("/logs")
 def blast_logs(
     limit: int = Query(50),
