@@ -6,6 +6,7 @@ import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+from pydantic import BaseModel
 
 from Pipeline.config import DATA_PATH
 from Pipeline.data.loader import load_customers
@@ -120,8 +121,14 @@ async def upload_dataset(file: UploadFile = File(...)):
     }
 
 
+class AnalyzeRequest(BaseModel):
+    ml_enabled: bool = False
+
+
 @router.post("/analyze")
-def analyze_dataset(ml_enabled: bool = False):
+def analyze_dataset(payload: AnalyzeRequest):
+    ml_enabled = payload.ml_enabled
+
     if not os.path.exists(DATA_PATH):
         raise HTTPException(
             status_code=404,
