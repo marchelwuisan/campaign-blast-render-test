@@ -1,10 +1,3 @@
-"""Live WhatsApp sender backed by the Meta (Facebook) Graph API.
-
-Business-initiated messages must use a pre-approved template, so every send
-posts a `type: template` payload to the Cloud API. Used when SENDER_MODE="meta";
-otherwise the MockSender is used instead.
-"""
-
 import time
 import requests
 
@@ -23,13 +16,14 @@ _INTERVAL = 1.0 / max(BLAST_RATE_LIMIT, 1)
 
 
 def _build_payload(msg: WhatsAppMessage) -> dict:
-    """Translate a WhatsAppMessage into the Graph API template payload."""
     template: dict = {
         "name": msg.template_name,
         "language": {"code": msg.language_code},
     }
-    # Fill the template's {{placeholders}} with named body parameters.
-    if msg.template_params:
+    if msg.components is not None:
+        template["components"] = msg.components
+    elif msg.template_params:
+        # Fill the template's {{placeholders}} with named body parameters.
         template["components"] = [{
             "type": "body",
             "parameters": [
@@ -47,16 +41,10 @@ def _build_payload(msg: WhatsAppMessage) -> dict:
 
 
 def _post(payload: dict) -> requests.Response:
-    """Single POST to the Graph API; 10s timeout to avoid hanging the blast."""
     return requests.post(_URL, headers=_HEADERS, json=payload, timeout=10)
 
 
 def send_meta(msg: WhatsAppMessage) -> dict:
-    """Send one message and return a result dict (never raises).
-
-    Outcomes are normalized to {"status": "sent" | "failed", ...} so callers
-    can aggregate results without handling HTTP/exception details.
-    """
     payload = _build_payload(msg)
 
     # First attempt; a timeout is treated as a (retryable) failure, not a crash.
@@ -94,7 +82,6 @@ def send_meta(msg: WhatsAppMessage) -> dict:
 
 
 def send_batch(messages: list) -> list:
-    """Send messages sequentially, pausing _INTERVAL between each to respect rate limits."""
     results = []
     for msg in messages:
         results.append(send_meta(msg))
@@ -103,7 +90,6 @@ def send_batch(messages: list) -> list:
 
 
 class MetaSender(BaseSender):
-    """BaseSender adapter so the blast pipeline can use Meta interchangeably with MockSender."""
 
     def send(
         self, message: WhatsAppMessage, customer_id: str, blast_id: str
