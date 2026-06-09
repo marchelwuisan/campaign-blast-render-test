@@ -82,4 +82,16 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_analyzed_risk
                 ON analyzed_customers (risk_level);
+
+            CREATE TABLE IF NOT EXISTS templates (
+                id              TEXT PRIMARY KEY,   -- Meta template id
+                name            TEXT NOT NULL,
+                status          TEXT,               -- APPROVED | PENDING | REJECTED | ...
+                language        TEXT,
+                category        TEXT,
+                raw             TEXT NOT NULL,      -- full Meta template object as JSON
+                synced_at       TIMESTAMP NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_templates_name
+                ON templates (name);
         """)

@@ -15,6 +15,7 @@ from Pipeline.messaging.constructor import construct_message, validate_message
 from Pipeline.messaging.base import BaseSender
 from Pipeline.messaging.mock_sender import MockSender
 from Pipeline.messaging.meta_sender import MetaSender
+from Pipeline.messaging import template_service
 from Pipeline.database.db import transaction
 
 router = APIRouter()
@@ -128,6 +129,10 @@ class BlastRequest(BaseModel):
 
 @router.post("/send")
 def blast_send(body: BlastRequest):
+    
+    if SENDER_MODE == "meta":
+        template_service.sync_quietly()
+
     at_risk = _run_engine(body.ml_enabled)
     at_risk = _apply_cooldown(at_risk)
     at_risk = _filter_unsubscribed(at_risk)
@@ -140,6 +145,16 @@ def blast_send(body: BlastRequest):
             status_code=400,
             detail={"message": "Pre-flight validation failed", "errors": errors},
         )
+
+    if SENDER_MODE == "meta":
+        template_errors = template_service.validate_sendable(
+            {(cm.message.template_name, cm.message.language_code) for cm in customer_messages}
+        )
+        if template_errors:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": "Template validation failed", "errors": template_errors},
+            )
 
     blast_id = str(uuid.uuid4())
     results = send_blast(customer_messages, blast_id)
