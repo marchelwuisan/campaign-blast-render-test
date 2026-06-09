@@ -1,6 +1,6 @@
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 
 from Pipeline.messaging import template_service, template_store
 
@@ -21,6 +21,19 @@ def _call(fn, *args, **kwargs):
 def sync_templates():
     count = _call(template_service.sync_all)
     return {"synced": count}
+
+
+@router.post("/upload-media", summary="Upload header media, returns a Meta handle",
+             responses={500: {"description": "`WA_APP_ID` is not configured"}})
+async def upload_media(file: UploadFile = File(...)):
+    content = await file.read()
+    handle = _call(
+        template_service.upload_media_handle,
+        content,
+        file.filename or "upload",
+        file.content_type or "application/octet-stream",
+    )
+    return {"h": handle}
 
 
 @router.post("", summary="Create a new template", responses=_WABA_MISSING_RESPONSE)

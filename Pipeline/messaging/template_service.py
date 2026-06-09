@@ -2,6 +2,7 @@ import requests
 
 from Pipeline.config import (
     WA_ACCESS_TOKEN,
+    WA_APP_ID,
     WA_BUSINESS_ACCOUNT_ID,
     WA_GRAPH_API_VERSION,
 )
@@ -18,7 +19,7 @@ _TIMEOUT = 10
 _TEMPLATE_FIELDS = (
     "id,name,status,language,category,sub_category,components,"
     "quality_score,rejected_reason,message_send_ttl_seconds,"
-    "previous_category,correct_category"
+    "previous_category,correct_category,parameter_format"
 )
 
 
@@ -95,6 +96,40 @@ def update_remote(template_id: str, payload: dict) -> dict:
             _template_url(template_id), headers=_HEADERS, json=payload, timeout=_TIMEOUT
         )
     )
+
+
+def upload_media_handle(file_bytes: bytes, file_name: str, file_type: str) -> str:
+    if not WA_APP_ID:
+        raise TemplateApiError(500, "WA_APP_ID is not set in environment")
+
+    session = _handle(
+        requests.post(
+            f"{_BASE_URL}/{WA_APP_ID}/uploads",
+            params={
+                "access_token": WA_ACCESS_TOKEN,
+                "file_name": file_name,
+                "file_length": len(file_bytes),
+                "file_type": file_type,
+            },
+            timeout=_TIMEOUT,
+        )
+    )
+    session_id = session.get("id")
+    if not session_id:
+        raise TemplateApiError(502, "Meta did not return an upload session id")
+
+    result = _handle(
+        requests.post(
+            f"{_BASE_URL}/{session_id}",
+            headers={"Authorization": f"OAuth {WA_ACCESS_TOKEN}", "file_offset": "0"},
+            data=file_bytes,
+            timeout=30,
+        )
+    )
+    handle = result.get("h")
+    if not handle:
+        raise TemplateApiError(502, "Meta did not return a media handle")
+    return handle
 
 
 def delete_remote(template_id: str) -> dict:

@@ -11,6 +11,7 @@ def _to_row(template: dict) -> tuple:
         template.get("status"),
         template.get("language"),
         template.get("category"),
+        template.get("parameter_format"),
         json.dumps(template),
         datetime.now(timezone.utc).isoformat(),
     )
@@ -22,8 +23,9 @@ def replace_all(templates: list[dict]) -> int:
         conn.execute("DELETE FROM templates")
         conn.executemany(
             """
-            INSERT INTO templates (id, name, status, language, category, raw, synced_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO templates
+                (id, name, status, language, category, parameter_format, raw, synced_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )

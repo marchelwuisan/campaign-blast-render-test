@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from Pipeline.engine.analyzer import AtRiskCustomer
 from Pipeline.promo.schema import PromoOffer
@@ -26,6 +26,10 @@ class WhatsAppMessage:
     template_name: str = TEMPLATE_NAME
     language_code: str = LANGUAGE_CODE
     template_params: List[Tuple[str, str]] = field(default_factory=list)
+    # Fully-formed Graph API `components` array. When set, it is sent verbatim
+    # (lets callers send any template shape — buttons, limited-time offer, media
+    # header, etc.). When None, a body component is built from template_params.
+    components: Optional[List[Dict[str, Any]]] = None
 
 
 def construct_message(customer: AtRiskCustomer, promo: PromoOffer) -> WhatsAppMessage:

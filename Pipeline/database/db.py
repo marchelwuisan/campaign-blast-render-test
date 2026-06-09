@@ -84,14 +84,20 @@ def init_db() -> None:
                 ON analyzed_customers (risk_level);
 
             CREATE TABLE IF NOT EXISTS templates (
-                id              TEXT PRIMARY KEY,   -- Meta template id
-                name            TEXT NOT NULL,
-                status          TEXT,               -- APPROVED | PENDING | REJECTED | ...
-                language        TEXT,
-                category        TEXT,
-                raw             TEXT NOT NULL,      -- full Meta template object as JSON
-                synced_at       TIMESTAMP NOT NULL
+                id                  TEXT PRIMARY KEY,   -- Meta template id
+                name                TEXT NOT NULL,
+                status              TEXT,               -- APPROVED | PENDING | REJECTED | ...
+                language            TEXT,
+                category            TEXT,
+                parameter_format    TEXT,               -- NAMED | POSITIONAL
+                raw                 TEXT NOT NULL,      -- full Meta template object as JSON
+                synced_at           TIMESTAMP NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_templates_name
                 ON templates (name);
         """)
+
+        # Migrate caches created before parameter_format existed.
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(templates)").fetchall()]
+        if "parameter_format" not in cols:
+            conn.execute("ALTER TABLE templates ADD COLUMN parameter_format TEXT")
