@@ -79,6 +79,12 @@ def send_blast(customer_messages, blast_id):
         result = sender.send(cm.message, cm.customer.customer_id, blast_id)
         results.append(result)
 
+        now = datetime.now()
+        # A code is redeemable once it's actually dispatched; a failed send is
+        # cancelled so it can never be redeemed.
+        code_status = "active" if result.status in ("sent", "mocked") else "cancelled"
+        expires_at = (now + timedelta(days=cm.promo.expiry_days)).isoformat()
+
         with transaction() as conn:
             conn.execute(
                 """
@@ -93,7 +99,27 @@ def send_blast(customer_messages, blast_id):
                     cm.message.template_name,
                     cm.promo.promo_code,
                     result.status,
-                    datetime.now().isoformat(),
+                    now.isoformat(),
+                ),
+            )
+            conn.execute(
+                """
+                INSERT INTO promo_codes
+                    (code, customer_id, name, phone, promo_type, promo_value,
+                     status, blast_id, issued_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    _generate_code(),
+                    cm.customer.customer_id,
+                    cm.customer.name,
+                    cm.message.to,
+                    cm.promo.promo_code,
+                    cm.promo.promo_value,
+                    code_status,
+                    blast_id,
+                    now.isoformat(),
+                    expires_at,
                 ),
             )
             conn.execute(

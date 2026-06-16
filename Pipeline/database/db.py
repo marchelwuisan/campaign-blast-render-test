@@ -30,6 +30,13 @@ def transaction():
 
 def init_db() -> None:
     with transaction() as conn:
+        # Drop a pre-existing orphaned promo_codes table that predates this
+        # schema (the old version lacked the phone column). It was never
+        # populated by code, so dropping is safe.
+        promo_cols = [r[1] for r in conn.execute("PRAGMA table_info(promo_codes)").fetchall()]
+        if promo_cols and "phone" not in promo_cols:
+            conn.execute("DROP TABLE promo_codes")
+
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS blast_log (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,6 +102,22 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_templates_name
                 ON templates (name);
+
+            CREATE TABLE IF NOT EXISTS promo_codes (
+                code            TEXT PRIMARY KEY,   -- unique per-issuance code, e.g. WA-X7K2AB
+                customer_id     TEXT NOT NULL,
+                name            TEXT,
+                phone           TEXT,
+                promo_type      TEXT,               -- generic promo code, e.g. DISC20
+                promo_value     TEXT,               -- human-readable, e.g. "20% off"
+                status          TEXT NOT NULL,      -- pending | active | redeemed | cancelled
+                blast_id        TEXT,
+                issued_at       TIMESTAMP NOT NULL,
+                expires_at      TIMESTAMP,
+                redeemed_at     TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_promo_codes_phone
+                ON promo_codes (phone);
         """)
 
         # Migrate caches created before parameter_format existed.
