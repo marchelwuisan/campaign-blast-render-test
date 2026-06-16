@@ -1,11 +1,63 @@
+import random
+import string
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Tuple
 
+from Pipeline.database.db import transaction
 from Pipeline.messaging.constructor import WhatsAppMessage
 from Pipeline.messaging.meta_sender import send_meta, send_batch
 
 router = APIRouter()
+
+
+def _generate_code() -> str:
+    chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # excludes 0/O, 1/I
+    return "WA-" + "".join(random.choices(chars, k=6))
+
+
+def _param(params, name: str):
+    """Pull a template param value by name (params is a list of TemplateParam)."""
+    for p in params or []:
+        if p.name == name:
+            return p.value
+    return None
+
+
+def _log_promo_codes(messages, results) -> None:
+    now = datetime.now()
+    try:
+        with transaction() as conn:
+            for item, result in zip(messages, results):
+                try:
+                    days = int(_param(item.template_params, "expiry_days") or 7)
+                except (TypeError, ValueError):
+                    days = 7
+                status = "active" if result.get("status") in ("sent", "mocked") else "cancelled"
+                conn.execute(
+                    """
+                    INSERT INTO promo_codes
+                        (code, customer_id, name, phone, promo_type, promo_value,
+                         status, blast_id, issued_at, expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        _generate_code(),
+                        item.customer_id,
+                        _param(item.template_params, "name"),
+                        item.to,
+                        item.promo_code,
+                        _param(item.template_params, "promo_value"),
+                        status,
+                        None,
+                        now.isoformat(),
+                        (now + timedelta(days=days)).isoformat(),
+                    ),
+                )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[messaging] failed to log promo_codes: {exc}")
 
 
 class TemplateParam(BaseModel):
@@ -77,6 +129,7 @@ def send_bulk_message(body: BulkSendRequest):
         )
 
     results = send_batch(wa_messages)
+    _log_promo_codes(body.messages, results)
 
     sent = sum(1 for r in results if r["status"] == "sent")
     failed = sum(1 for r in results if r["status"] == "failed")
