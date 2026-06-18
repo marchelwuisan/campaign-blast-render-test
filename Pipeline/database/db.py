@@ -37,6 +37,10 @@ def init_db() -> None:
         if promo_cols and "phone" not in promo_cols:
             conn.execute("DROP TABLE promo_codes")
 
+        blast_cols = [r[1] for r in conn.execute("PRAGMA table_info(blast_log)").fetchall()]
+        if blast_cols and "mode" not in blast_cols:
+            conn.execute("ALTER TABLE blast_log ADD COLUMN mode TEXT")
+
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS blast_log (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,9 +49,10 @@ def init_db() -> None:
                 phone           TEXT NOT NULL,
                 template_name   TEXT NOT NULL,
                 promo_code      TEXT,
-                status          TEXT NOT NULL,  -- sent | mocked | failed 
+                status          TEXT NOT NULL,  -- sent | mocked | failed
                 error_code      TEXT,
                 error_reason    TEXT,
+                mode            TEXT,           -- meta | mock
                 sent_at         TIMESTAMP NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_blast_log_blast_id

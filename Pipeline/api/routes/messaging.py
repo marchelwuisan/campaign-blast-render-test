@@ -1,5 +1,5 @@
 import random
-import string
+import uuid
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
@@ -26,16 +26,37 @@ def _param(params, name: str):
     return None
 
 
-def _log_promo_codes(messages, results) -> None:
+def _log_dispatch(blast_id: str, mode: str, messages, results) -> None:
     now = datetime.now()
     try:
         with transaction() as conn:
             for item, result in zip(messages, results):
+                status = result.get("status")
                 try:
                     days = int(_param(item.template_params, "expiry_days") or 7)
                 except (TypeError, ValueError):
                     days = 7
-                status = "active" if result.get("status") in ("sent", "mocked") else "cancelled"
+
+                conn.execute(
+                    """
+                    INSERT INTO blast_log
+                        (blast_id, customer_id, phone, template_name, promo_code,
+                         status, error_code, error_reason, mode, sent_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        blast_id,
+                        item.customer_id,
+                        item.to,
+                        item.template_name,
+                        item.promo_code,
+                        status,
+                        result.get("error_code"),
+                        result.get("error_reason"),
+                        mode,
+                        now.isoformat(),
+                    ),
+                )
                 conn.execute(
                     """
                     INSERT INTO promo_codes
@@ -50,14 +71,14 @@ def _log_promo_codes(messages, results) -> None:
                         item.to,
                         item.promo_code,
                         _param(item.template_params, "promo_value"),
-                        status,
-                        None,
+                        "active" if status in ("sent", "mocked") else "cancelled",
+                        blast_id,
                         now.isoformat(),
                         (now + timedelta(days=days)).isoformat(),
                     ),
                 )
     except Exception as exc:  # noqa: BLE001
-        print(f"[messaging] failed to log promo_codes: {exc}")
+        print(f"[messaging] failed to log dispatch: {exc}")
 
 
 class TemplateParam(BaseModel):
@@ -76,6 +97,7 @@ class SendMessageRequest(BaseModel):
 
 class BulkSendRequest(BaseModel):
     messages: List[SendMessageRequest]
+    sender_mode: str = "meta"
 
 
 @router.post("/send")
@@ -129,12 +151,15 @@ def send_bulk_message(body: BulkSendRequest):
         )
 
     results = send_batch(wa_messages)
-    _log_promo_codes(body.messages, results)
+
+    blast_id = str(uuid.uuid4())
+    _log_dispatch(blast_id, body.sender_mode, body.messages, results)
 
     sent = sum(1 for r in results if r["status"] == "sent")
     failed = sum(1 for r in results if r["status"] == "failed")
 
     return {
+        "blast_id": blast_id,
         "total": len(results),
         "sent": sent,
         "failed": failed,
