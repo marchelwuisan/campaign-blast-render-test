@@ -93,6 +93,9 @@ class SendMessageRequest(BaseModel):
     template_name: str = "reengagement_promo"
     language_code: str = "en"
     template_params: Optional[List[TemplateParam]] = None
+    parameter_format: str = "NAMED"
+    header_param: Optional[dict] = None  # {"name": <param_name>, "value": <text>}
+    header_media: Optional[dict] = None
 
 
 class BulkSendRequest(BaseModel):
@@ -116,6 +119,9 @@ def send_message(body: SendMessageRequest):
         template_name=body.template_name,
         language_code=body.language_code,
         template_params=params,
+        parameter_format=body.parameter_format,
+        header_param=body.header_param,
+        header_media=body.header_media,
     )
 
     result = send_meta(msg)
@@ -147,6 +153,9 @@ def send_bulk_message(body: BulkSendRequest):
                 template_name=item.template_name,
                 language_code=item.language_code,
                 template_params=params,
+                parameter_format=item.parameter_format,
+                header_param=item.header_param,
+                header_media=item.header_media,
             )
         )
 
