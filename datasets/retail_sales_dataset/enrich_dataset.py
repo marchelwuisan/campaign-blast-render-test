@@ -17,7 +17,7 @@ PROFILES = {
 df = pd.read_csv(INPUT)
 df.columns = df.columns.str.lower().str.replace(" ", "_")
 df = df.rename(columns={"total_amount": "order_value", "date": "purchase_date"})
-df["phone_number"] = "+6282187792052"
+df["phone_number"] = "+6282123501897"
 df["created_at"]   = "2023-01-01"
 
 # Lock gender and age per customer from original data
@@ -89,7 +89,7 @@ for cid, (pname, pconf) in cutoffs.items():
             "quantity":         qty,
             "price_per_unit":   price,
             "order_value":      price * qty,
-            "phone_number":     "+6282187792052",
+            "phone_number":     "+6282123501897",
             "created_at":       "2023-01-01",
         })
         txn_counter += 1
