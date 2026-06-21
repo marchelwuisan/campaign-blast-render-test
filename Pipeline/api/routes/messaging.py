@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Tuple
 
+from Pipeline.config import BLAST_COOLDOWN_DAYS
 from Pipeline.database.db import transaction
 from Pipeline.messaging.constructor import WhatsAppMessage
 from Pipeline.messaging.meta_sender import send_meta, send_batch
@@ -200,13 +201,56 @@ def send_message(body: SendMessageRequest):
     return result
 
 
+def _phone_tail(phone: str) -> str:
+    """Last 9 digits — the format-agnostic key for matching phone numbers."""
+    return "".join(ch for ch in (phone or "") if ch.isdigit())[-9:]
+
+
+def _drop_unsubscribed(messages):
+    """Filter out recipients who have opted out (last-line compliance gate)."""
+    with transaction() as conn:
+        rows = conn.execute(
+            "SELECT customer_id, phone_number FROM customer WHERE is_unsubscribe = 1"
+        ).fetchall()
+    unsub_ids = {r["customer_id"] for r in rows}
+    unsub_tails = {_phone_tail(r["phone_number"]) for r in rows}
+    return [
+        m for m in messages
+        if m.customer_id not in unsub_ids and _phone_tail(m.to) not in unsub_tails
+    ]
+
+
+def _drop_on_cooldown(messages):
+    """Filter out recipients blasted within the last BLAST_COOLDOWN_DAYS."""
+    cutoff = (datetime.now() - timedelta(days=BLAST_COOLDOWN_DAYS)).isoformat()
+    with transaction() as conn:
+        rows = conn.execute(
+            "SELECT customer_id, phone_number FROM customer WHERE last_sent_at >= ?",
+            (cutoff,),
+        ).fetchall()
+    recent_ids = {r["customer_id"] for r in rows}
+    recent_tails = {_phone_tail(r["phone_number"]) for r in rows}
+    return [
+        m for m in messages
+        if m.customer_id not in recent_ids and _phone_tail(m.to) not in recent_tails
+    ]
+
+
 @router.post("/send-bulk")
 def send_bulk_message(body: BulkSendRequest):
     if not body.messages:
         raise HTTPException(status_code=400, detail="messages list is empty")
 
+    # Apply the same gates as the engine path: never message an opt-out, and
+    # skip anyone blasted within the cooldown window.
+    after_optout = _drop_unsubscribed(body.messages)
+    messages = _drop_on_cooldown(after_optout)
+    skipped_unsubscribed = len(body.messages) - len(after_optout)
+    skipped_cooldown = len(after_optout) - len(messages)
+    skipped = skipped_unsubscribed + skipped_cooldown
+
     wa_messages = []
-    for item in body.messages:
+    for item in messages:
         params = (
             [(p.name, p.value) for p in item.template_params]
             if item.template_params
@@ -230,15 +274,18 @@ def send_bulk_message(body: BulkSendRequest):
     results = send_batch(wa_messages)
 
     blast_id = str(uuid.uuid4())
-    _log_dispatch(blast_id, body.sender_mode, body.messages, results)
+    _log_dispatch(blast_id, body.sender_mode, messages, results)
 
     sent = sum(1 for r in results if r["status"] == "sent")
     failed = sum(1 for r in results if r["status"] == "failed")
 
     return {
         "blast_id": blast_id,
-        "total": len(results),
+        "total": len(body.messages),
         "sent": sent,
         "failed": failed,
+        "skipped": skipped,
+        "skipped_unsubscribed": skipped_unsubscribed,
+        "skipped_cooldown": skipped_cooldown,
         "results": results,
     }
