@@ -123,6 +123,19 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_promo_codes_phone
                 ON promo_codes (phone);
+
+            CREATE TABLE IF NOT EXISTS incoming_messages (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender      TEXT NOT NULL,
+                content     TEXT,
+                received_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS outgoing_messages (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                recipient   TEXT NOT NULL,
+                sent_at     TEXT NOT NULL
+            );
         """)
 
         # Migrate caches created before parameter_format existed.

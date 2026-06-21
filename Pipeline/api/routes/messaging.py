@@ -82,8 +82,21 @@ def _log_dispatch(blast_id: str, mode: str, messages, results) -> None:
 
 
 class TemplateParam(BaseModel):
-    name: str
-    value: str
+    name: str   # variable name (or "1", "2" for positional templates)
+    value: str  # value to substitute
+
+
+class HeaderParam(BaseModel):
+    """A single TEXT-header variable."""
+    name: str   # the header variable name, e.g. "first_name"
+    value: str  # value to substitute
+
+
+class HeaderMedia(BaseModel):
+    """Image/video/document header media. Provide `link` OR `id`."""
+    type: str = "image"           # image | video | document
+    link: Optional[str] = None    # public HTTPS URL
+    id: Optional[str] = None       # media id from /{phone-number-id}/media
 
 
 class SendMessageRequest(BaseModel):
@@ -92,15 +105,53 @@ class SendMessageRequest(BaseModel):
     promo_code: str
     template_name: str = "reengagement_promo"
     language_code: str = "en"
+    parameter_format: str = "NAMED"  # NAMED | POSITIONAL
     template_params: Optional[List[TemplateParam]] = None
-    parameter_format: str = "NAMED"
-    header_param: Optional[dict] = None  # {"name": <param_name>, "value": <text>}
-    header_media: Optional[dict] = None
+    header_param: Optional[HeaderParam] = None
+    header_media: Optional[HeaderMedia] = None
 
 
 class BulkSendRequest(BaseModel):
     messages: List[SendMessageRequest]
-    sender_mode: str = "meta"
+    sender_mode: str = "meta"  # meta | mock
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "sender_mode": "meta",
+                "messages": [
+                    {
+                        "to": "+628123456789",
+                        "customer_id": "C1",
+                        "promo_code": "DISC20",
+                        "template_name": "reengagement_promo",
+                        "language_code": "id",
+                        "parameter_format": "NAMED",
+                        "header_param": {"name": "first_name", "value": "John"},
+                        "header_media": None,
+                        "template_params": [
+                            {"name": "promo_value", "value": "20% off your next order"},
+                            {"name": "promo_code", "value": "DISC20"},
+                            {"name": "expiry_days", "value": "7"},
+                        ],
+                    },
+                    {
+                        "to": "+628987654321",
+                        "customer_id": "C2",
+                        "promo_code": "DISC20",
+                        "template_name": "promo_with_image",
+                        "language_code": "id",
+                        "parameter_format": "NAMED",
+                        "header_param": None,
+                        "header_media": {"type": "image", "link": "https://yourcdn.com/promo.jpg"},
+                        "template_params": [
+                            {"name": "promo_value", "value": "Buy 1 Get 1"},
+                        ],
+                    },
+                ],
+            }
+        }
+    }
 
 
 @router.post("/send")
@@ -120,8 +171,8 @@ def send_message(body: SendMessageRequest):
         language_code=body.language_code,
         template_params=params,
         parameter_format=body.parameter_format,
-        header_param=body.header_param,
-        header_media=body.header_media,
+        header_param=body.header_param.model_dump() if body.header_param else None,
+        header_media=body.header_media.model_dump() if body.header_media else None,
     )
 
     result = send_meta(msg)
@@ -154,8 +205,8 @@ def send_bulk_message(body: BulkSendRequest):
                 language_code=item.language_code,
                 template_params=params,
                 parameter_format=item.parameter_format,
-                header_param=item.header_param,
-                header_media=item.header_media,
+                header_param=item.header_param.model_dump() if item.header_param else None,
+                header_media=item.header_media.model_dump() if item.header_media else None,
             )
         )
 
