@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from Pipeline.database.db import init_db
-from Pipeline.api.routes import customers, blast, analytics, messaging, dataset, templates, promos, blast_logs
+from Pipeline.api.routes import customers, blast, analytics, messaging, dataset, templates, promos, blast_logs, webhook
 
 
 @asynccontextmanager
@@ -37,3 +37,4 @@ app.include_router(dataset.router, prefix="/dataset", tags=["Dataset"])
 app.include_router(templates.router, prefix="/templates", tags=["Templates"])
 app.include_router(promos.router, prefix="/promo-codes", tags=["Promo codes"])
 app.include_router(blast_logs.router, prefix="/blasts", tags=["Dispatch logs"])
+app.include_router(webhook.router, tags=["Webhook"])

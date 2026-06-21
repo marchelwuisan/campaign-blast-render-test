@@ -40,6 +40,7 @@ WA_PHONE_NUMBER_ID = os.getenv("WA_PHONE_NUMBER_ID", "")
 WA_BUSINESS_ACCOUNT_ID = os.getenv("WA_BUSINESS_ACCOUNT_ID", "")
 WA_APP_ID = os.getenv("WA_APP_ID", "")
 WA_GRAPH_API_VERSION = os.getenv("WA_GRAPH_API_VERSION", "v25.0")
+WA_VERIFY_TOKEN = os.getenv("WA_VERIFY_TOKEN", "wa_verify_token")  # webhook handshake token
 
 # --- ML ---
 ML_MODEL_PATH = os.getenv(
