@@ -77,6 +77,23 @@ def _log_dispatch(blast_id: str, mode: str, messages, results) -> None:
                         (now + timedelta(days=days)).isoformat(),
                     ),
                 )
+                # Upsert the durable customer row so cooldown + opt-out have an
+                # anchor. is_unsubscribe is intentionally left untouched so an
+                # existing opt-out survives re-blasts.
+                conn.execute(
+                    """
+                    INSERT INTO customer (customer_id, phone_number, last_sent_at, sent_promo_types)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(customer_id) DO UPDATE SET
+                        phone_number = excluded.phone_number,
+                        last_sent_at = excluded.last_sent_at,
+                        sent_promo_types = CASE
+                            WHEN sent_promo_types = '' THEN excluded.sent_promo_types
+                            ELSE sent_promo_types || ',' || excluded.sent_promo_types
+                        END
+                    """,
+                    (item.customer_id, item.to, now.isoformat(), item.promo_code or ""),
+                )
     except Exception as exc:  # noqa: BLE001
         print(f"[messaging] failed to log dispatch: {exc}")
 

@@ -17,13 +17,16 @@ def _is_opt_out(content: str) -> bool:
 
 
 def _flag_unsubscribe(sender: str) -> int:
-    # Meta sends `sender` without a "+" (e.g. "6282123501897") while
-    # customer.phone_number is stored with it, so compare digits only.
-    digits = sender.lstrip("+")
+    # Phone formats vary ("+62…", "62…", "08…"), so match on the last 9 digits
+    # (the national subscriber number) instead of an exact string.
+    tail = "".join(ch for ch in (sender or "") if ch.isdigit())[-9:]
     with transaction() as conn:
         cursor = conn.execute(
-            "UPDATE customer SET is_unsubscribe = 1 WHERE REPLACE(phone_number, '+', '') = ?",
-            (digits,),
+            """
+            UPDATE customer SET is_unsubscribe = 1
+            WHERE substr(REPLACE(REPLACE(phone_number, '+', ''), ' ', ''), -9) = ?
+            """,
+            (tail,),
         )
         return cursor.rowcount
 
